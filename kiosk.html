@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="robots" content="noindex" />
+  <title>ตู้กดบัตรคิว — ระบบจองคิว</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+  <!--
+    ตู้กดบัตรคิว walk-in ณ ที่ทำการ (แท็บเล็ต / จอสัมผัส)
+    ครั้งแรกเปิด  kiosk.html?key=<KIOSK_KEY จากชีต Config>   (ตู้จะจำรหัสไว้ แล้วซ่อนออกจากแถบที่อยู่)
+    พารามิเตอร์ (ไม่บังคับ):
+      &print=auto     พิมพ์บัตรคิวอัตโนมัติ (ต่อเครื่องพิมพ์ใบเสร็จ 80 มม.)  · button = แสดงปุ่มพิมพ์ (ค่าเริ่มต้น) · off = ไม่พิมพ์
+      &depts=FIN,LOAN แสดงเฉพาะบางแผนก
+    พิมพ์อัตโนมัติแบบไม่ถามหน้าต่างพิมพ์: เปิด Chrome ด้วย  --kiosk --kiosk-printing
+  -->
+  <style>
+    :root { --brand: #047857; --brand2: #0f766e; --ink: #0f172a; --muted: #64748b; --bg: #f1f5f9; --line: #e2e8f0; }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    [hidden] { display: none !important; }
+    html, body { margin: 0; height: 100%; }
+    body { font-family: 'Sarabun', system-ui, sans-serif; background: var(--bg); color: var(--ink); display: flex; flex-direction: column;
+           user-select: none; -webkit-user-select: none; overflow: hidden; }
+    header { display: flex; align-items: center; gap: 14px; padding: 14px 24px; color: #fff; background: linear-gradient(90deg, var(--brand), var(--brand2)); }
+    #logo { width: 56px; height: 56px; border-radius: 50%; background: #fff; padding: 3px; object-fit: contain; }
+    .brand { flex: 1; min-width: 0; line-height: 1.25; }
+    .brand b { display: block; font-size: 24px; font-weight: 800; }
+    .brand span { font-size: 15px; opacity: .9; }
+    #clock { font-size: 34px; font-weight: 800; font-variant-numeric: tabular-nums; text-align: right; line-height: 1; }
+    #today { font-size: 14px; opacity: .9; text-align: right; }
+    main { flex: 1; min-height: 0; overflow-y: auto; padding: 22px 24px 28px; }
+    h1 { margin: 0 0 4px; font-size: 32px; font-weight: 800; text-align: center; }
+    .sub { text-align: center; color: var(--muted); font-size: 18px; margin: 0 0 20px; }
+    #depts { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); max-width: 1200px; margin: 0 auto; }
+    .dept { display: flex; align-items: center; gap: 16px; text-align: left; width: 100%; padding: 20px 22px; border: 0; border-radius: 22px;
+            background: #fff; box-shadow: 0 2px 6px rgba(15, 23, 42, .08); font: inherit; color: inherit; cursor: pointer; transition: transform .08s; }
+    .dept:active { transform: scale(.98); background: #ecfdf5; }
+    .dept .ic { font-size: 44px; width: 56px; text-align: center; flex: none; }
+    .dept .tx { flex: 1; min-width: 0; }
+    .dept b { display: block; font-size: 24px; font-weight: 800; line-height: 1.25; }
+    .dept small { display: block; font-size: 16px; color: var(--muted); margin-top: 2px; }
+    .dept .wait { flex: none; text-align: center; background: #ecfdf5; color: var(--brand); border-radius: 14px; padding: 8px 10px; min-width: 70px; }
+    .dept .wait em { display: block; font-style: normal; font-size: 30px; font-weight: 800; line-height: 1.1; }
+    .dept .wait span { font-size: 13px; }
+    .dept[disabled] { opacity: .5; cursor: default; }
+    .dept[disabled] .wait { background: #f1f5f9; color: var(--muted); }
+    #closed { max-width: 700px; margin: 60px auto; background: #fff; border-radius: 22px; padding: 40px; text-align: center; font-size: 26px; font-weight: 700; }
+    footer { text-align: center; color: var(--muted); font-size: 14px; padding: 8px; }
+
+    /* ---- หน้าบัตรคิว ---- */
+    #view-ticket { flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .card { background: #fff; border-radius: 28px; box-shadow: 0 6px 24px rgba(15, 23, 42, .12); padding: 28px 34px; text-align: center; width: min(560px, 100%); }
+    .card .dn { font-size: 24px; font-weight: 700; color: var(--brand); }
+    .card .lbl { font-size: 18px; color: var(--muted); margin-top: 8px; }
+    #t-q { font-size: 112px; font-weight: 800; line-height: 1; letter-spacing: .05em; margin: 4px 0 6px; }
+    .card .info { display: flex; justify-content: center; gap: 22px; font-size: 18px; margin: 6px 0 14px; }
+    .card .info b { font-size: 26px; display: block; }
+    #t-qr svg { width: 190px; height: 190px; }
+    .card .qrnote { font-size: 16px; color: var(--muted); margin: 4px 0 16px; }
+    .btns { display: flex; gap: 12px; justify-content: center; }
+    .btn { font: inherit; font-size: 22px; font-weight: 700; border: 0; border-radius: 16px; padding: 14px 28px; cursor: pointer; }
+    .btn.pri { background: var(--brand); color: #fff; }
+    .btn.sec { background: #e2e8f0; color: var(--ink); }
+    #t-back { margin-top: 10px; font-size: 15px; color: var(--muted); }
+
+    #busy { position: fixed; inset: 0; background: rgba(15, 23, 42, .45); display: flex; align-items: center; justify-content: center; z-index: 20; }
+    #busy div { background: #fff; padding: 26px 40px; border-radius: 20px; font-size: 24px; font-weight: 700; }
+    #toast { position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); background: #be123c; color: #fff; padding: 16px 26px;
+             border-radius: 16px; font-size: 20px; font-weight: 600; z-index: 30; max-width: 90vw; text-align: center; }
+
+    /* ---- บัตรคิวสำหรับเครื่องพิมพ์ใบเสร็จ 80 มม. ---- */
+    #slip { display: none; }
+    @media print {
+      @page { size: 80mm auto; margin: 0; }
+      body { background: #fff; display: block; overflow: visible; }
+      body > *:not(#slip) { display: none !important; }
+      #slip { display: block; width: 72mm; margin: 0 auto; padding: 3mm 0 6mm; text-align: center; color: #000; font-family: 'Sarabun', sans-serif; }
+      #slip .o { font-size: 11pt; font-weight: 700; }
+      #slip .d { font-size: 13pt; font-weight: 700; margin-top: 2mm; }
+      #slip .q { font-size: 44pt; font-weight: 800; line-height: 1.05; margin: 1mm 0; }
+      #slip .m { font-size: 10pt; }
+      #slip svg { width: 34mm; height: 34mm; margin-top: 2mm; }
+      #slip .n { font-size: 9pt; }
+      #slip hr { border: 0; border-top: 1px dashed #000; margin: 2mm 0; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <img id="logo" alt="" hidden />
+    <div class="brand"><b id="sys">ตู้กดบัตรคิว</b><span id="org"></span></div>
+    <div><div id="clock">--:--</div><div id="today"></div></div>
+  </header>
+
+  <!-- เลือกแผนก -->
+  <main id="view-home">
+    <h1>กดรับบัตรคิว</h1>
+    <p class="sub">เลือกบริการที่ต้องการ · สมาชิกที่จองคิวออนไลน์ไว้ ไม่ต้องกดบัตรคิว</p>
+    <div id="closed" hidden></div>
+    <div id="depts"></div>
+  </main>
+
+  <!-- บัตรคิว -->
+  <section id="view-ticket" hidden>
+    <div class="card">
+      <div class="dn" id="t-dept"></div>
+      <div class="lbl">หมายเลขคิวของคุณ</div>
+      <div id="t-q"></div>
+      <div class="info">
+        <div><b id="t-ahead">-</b>คิวก่อนหน้า</div>
+        <div><b id="t-slot">-</b>ช่วงเวลา</div>
+      </div>
+      <div id="t-qr"></div>
+      <div class="qrnote">📱 สแกน QR เพื่อติดตามคิวบนมือถือ<span id="t-line"> และรับแจ้งเตือนทาง LINE</span></div>
+      <div class="btns">
+        <button class="btn sec" id="btn-print" hidden>🖨️ พิมพ์บัตรคิว</button>
+        <button class="btn pri" id="btn-done">เสร็จสิ้น</button>
+      </div>
+      <div id="t-back"></div>
+    </div>
+  </section>
+
+  <footer id="foot"></footer>
+  <div id="busy" hidden><div>กำลังออกบัตรคิว...</div></div>
+  <div id="toast" hidden></div>
+  <div id="slip"></div>
+
+<script>
+const APP = {
+  API_URL: 'https://script.google.com/macros/s/AKfycbxsWhekn5r2CQQ552TU6foeP6ENDifmzCUt63Kl3GOO253Dq2aL0pIroqJVs9s85-Exzw/exec',
+  RETURN_SEC: 25,      // กลับหน้าแรกอัตโนมัติ
+  POLL_MS: 15000,
+};
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+};
+
+// รหัสตู้ + โหมดพิมพ์: รับจาก URL ครั้งแรกแล้วจำไว้ในเครื่อง (ซ่อนรหัสออกจากแถบที่อยู่)
+const P = new URLSearchParams(location.search);
+['key', 'print', 'depts'].forEach((k) => { if (P.has(k)) store.set('kiosk_' + k, P.get(k)); });
+if (P.has('key')) history.replaceState(null, '', location.pathname);
+const KEY = store.get('kiosk_key') || '';
+const PRINT = store.get('kiosk_print') || 'button';
+const ONLY = (store.get('kiosk_depts') || '').toUpperCase().split(/[,\s]+/).filter(Boolean);
+
+const st = { info: null, busy: false, timer: null, left: 0 };
+
+async function api(action, data) {
+  let res;
+  try {
+    const r = await fetch(APP.API_URL, { method: 'POST', body: JSON.stringify(Object.assign({ action, key: KEY }, data || {})), redirect: 'follow' });
+    res = await r.json();
+  } catch (e) { throw new Error('เชื่อมต่อระบบไม่ได้ กรุณาลองใหม่'); }
+  if (!res || !res.ok) { const e = new Error((res && res.message) || 'เกิดข้อผิดพลาด'); e.code = res && res.code; throw e; }
+  return res.data;
+}
+
+function toast(msg) {
+  $('toast').textContent = msg; $('toast').hidden = false;
+  clearTimeout(toast.t); toast.t = setTimeout(() => { $('toast').hidden = true; }, 4500);
+}
+
+function tick() {
+  const d = new Date();
+  $('clock').textContent = d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+  $('today').textContent = d.toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+/* ------------------------------------------------------------------ หน้าแรก */
+async function loadInfo() {
+  if (!KEY) { showClosed('ตู้ยังไม่ได้ตั้งค่า — เปิดหน้านี้ด้วย kiosk.html?key=รหัส KIOSK_KEY จากชีต Config'); return; }
+  try {
+    const d = await api('kioskInfo');
+    st.info = d;
+    brand(d);
+    renderDepts();
+  } catch (e) {
+    if (e.code === 'FORBIDDEN' || e.code === 'SETUP_REQUIRED') showClosed(e.message);
+  }
+}
+
+function brand(d) {
+  $('sys').textContent = d.systemName || 'ตู้กดบัตรคิว';
+  $('org').textContent = d.orgName || '';
+  if (d.logoUrl && $('logo').hidden) { $('logo').src = d.logoUrl; $('logo').hidden = false; $('logo').onerror = () => { $('logo').hidden = true; }; }
+  $('foot').textContent = d.announcement || '';
+}
+
+function showClosed(msg) {
+  $('closed').textContent = msg; $('closed').hidden = false; $('depts').innerHTML = '';
+}
+
+function renderDepts() {
+  const d = st.info;
+  if (!d.open) { showClosed('⛔ ' + (d.closedMessage || 'ปิดให้บริการ')); return; }
+  $('closed').hidden = true;
+  const list = d.depts.filter((x) => !ONLY.length || ONLY.indexOf(String(x.id).toUpperCase()) >= 0);
+  $('depts').innerHTML = list.map((x) => `
+    <button class="dept" data-id="${esc(x.id)}" ${x.available ? '' : 'disabled'}>
+      <span class="ic">${esc(x.icon)}</span>
+      <span class="tx"><b>${esc(x.name)}</b><small>${x.available ? esc(x.description || '') : esc(x.reason)}</small></span>
+      <span class="wait"><em>${x.waiting}</em><span>คิวรอ</span></span>
+    </button>`).join('');
+}
+
+/* ------------------------------------------------------------------ ออกบัตรคิว */
+async function book(deptId) {
+  if (st.busy) return;
+  st.busy = true;
+  $('busy').hidden = false;
+  try {
+    const t = await api('kioskBook', { deptId });
+    showTicket(t);
+  } catch (e) {
+    toast(e.message);
+    loadInfo();
+  } finally {
+    st.busy = false;
+    $('busy').hidden = true;
+  }
+}
+
+function qrSvg(text, cell) {
+  try {
+    const qr = qrcode(0, 'M'); qr.addData(text); qr.make();
+    return qr.createSvgTag({ cellSize: cell || 4, margin: 2, scalable: true });
+  } catch (e) { return ''; }
+}
+
+function showTicket(t) {
+  $('view-home').hidden = true;
+  $('view-ticket').hidden = false;
+  $('t-dept').textContent = (t.deptIcon || '') + ' ' + t.deptName;
+  $('t-q').textContent = t.queueNo;
+  $('t-ahead').textContent = t.ahead;
+  $('t-slot').textContent = t.slotLabel.replace(/\s*น\.$/, '');
+  $('t-qr').innerHTML = qrSvg(t.ticketUrl, 5);
+  $('t-line').hidden = !/liff\.line\.me/.test(t.ticketUrl);
+  $('btn-print').hidden = PRINT !== 'button';
+  const d = new Date();
+  $('slip').innerHTML = `
+    <div class="o">${esc(st.info ? st.info.orgName || st.info.systemName : '')}</div><hr>
+    <div class="d">${esc(t.deptName)}</div>
+    <div class="q">${esc(t.queueNo)}</div>
+    <div class="m">ก่อนหน้าคุณ ${t.ahead} คิว · ช่วง ${esc(t.slotLabel)}</div>
+    ${t.counterNos && t.counterNos.length ? `<div class="m">ให้บริการที่ช่อง ${esc(t.counterNos.join(', '))}</div>` : ''}
+    ${qrSvg(t.ticketUrl, 3)}
+    <div class="n">สแกนเพื่อติดตามคิวบนมือถือ</div><hr>
+    <div class="n">ออกบัตร ${d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })} ${d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น. · ใช้ได้เฉพาะวันนี้</div>`;
+  if (PRINT === 'auto') setTimeout(() => window.print(), 300);
+  st.left = APP.RETURN_SEC;
+  clearInterval(st.timer);
+  countdown();
+  st.timer = setInterval(countdown, 1000);
+}
+
+function countdown() {
+  $('t-back').textContent = 'กลับหน้าแรกใน ' + st.left + ' วินาที';
+  if (st.left-- <= 0) goHome();
+}
+
+function goHome() {
+  clearInterval(st.timer);
+  $('view-ticket').hidden = true;
+  $('view-home').hidden = false;
+  loadInfo();
+}
+
+/* ------------------------------------------------------------------ init */
+$('depts').addEventListener('click', (e) => {
+  const b = e.target.closest('.dept');
+  if (b && !b.disabled) book(b.dataset.id);
+});
+$('btn-done').addEventListener('click', goHome);
+$('btn-print').addEventListener('click', () => window.print());
+document.addEventListener('contextmenu', (e) => e.preventDefault());
+tick();
+setInterval(tick, 1000);
+loadInfo();
+setInterval(() => { if (!$('view-home').hidden && !st.busy) loadInfo(); }, APP.POLL_MS);
+</script>
+</body>
+</html>
