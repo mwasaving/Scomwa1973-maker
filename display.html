@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>จอแสดงคิว — ระบบจองคิว</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <!--
+    จอแสดงคิว ณ จุดให้บริการ (เปิดบนทีวี / จอคอมพิวเตอร์ แล้วกดเต็มจอ)
+    พารามิเตอร์ (ไม่บังคับ):
+      ?depts=FIN,LOAN   แสดงเฉพาะแผนก (รหัสจากชีต Departments)  — ไม่ใส่ = ทุกแผนก
+      &voice=0          ปิดเสียงพูดประกาศ (ยังมีเสียงกริ่ง)
+      &sound=0          ปิดเสียงทั้งหมด
+      &poll=4           ความถี่ดึงข้อมูล (วินาที, ขั้นต่ำ 3)
+  -->
+  <style>
+    :root {
+      --bg: #062a24; --panel: #0b3a32; --panel2: #0f4a40; --line: #1d5e52;
+      --ink: #f1f5f9; --muted: #9fc9bd; --accent: #fbbf24; --ok: #34d399;
+    }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    html, body { margin: 0; height: 100%; }
+    body {
+      font-family: 'Sarabun', system-ui, sans-serif; background: var(--bg); color: var(--ink);
+      display: flex; flex-direction: column; overflow: hidden; cursor: default;
+    }
+    header {
+      display: flex; align-items: center; gap: 1.2vw; padding: 1.2vh 2vw;
+      background: linear-gradient(90deg, #047857, #0f766e); box-shadow: 0 2px 10px rgba(0,0,0,.25);
+    }
+    #logo { height: 6.5vh; width: 6.5vh; border-radius: 50%; background: #fff; padding: .3vh; object-fit: contain; }
+    .brand { flex: 1; min-width: 0; line-height: 1.2; }
+    .brand b { display: block; font-size: 2.6vh; font-weight: 800; }
+    .brand span { font-size: 1.8vh; opacity: .85; }
+    .clock { text-align: right; line-height: 1.1; }
+    #clock { font-size: 4.6vh; font-weight: 800; font-variant-numeric: tabular-nums; }
+    #today { font-size: 1.7vh; opacity: .9; }
+    #net { width: 1.4vh; height: 1.4vh; border-radius: 50%; background: var(--ok); display: inline-block; margin-left: .6vw; vertical-align: middle; }
+    #net.bad { background: #f87171; }
+
+    main { flex: 1; min-height: 0; display: grid; grid-template-rows: 46% 1fr; gap: 1.6vh; padding: 1.6vh 2vw; }
+    .top { display: grid; grid-template-columns: 1.55fr 1fr; gap: 1.6vh 1.4vw; min-height: 0; }
+
+    #hero {
+      background: var(--panel); border: .3vh solid var(--line); border-radius: 2.4vh;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 1vh 2vw;
+      transition: background .3s, border-color .3s;
+    }
+    #hero.flash { animation: flash 1s ease-in-out 6; border-color: var(--accent); }
+    @keyframes flash { 50% { background: #0f5f4f; } }
+    .hero-label { font-size: 3.2vh; color: var(--muted); font-weight: 600; }
+    #hero-q { font-size: 17vh; line-height: 1; font-weight: 800; color: var(--accent); letter-spacing: .08em; font-variant-numeric: tabular-nums; }
+    .hero-to { font-size: 5vh; font-weight: 700; margin-top: .6vh; }
+    .hero-to b { color: #fff; background: #047857; padding: .2vh 1.4vw; border-radius: 1.4vh; }
+    #hero-d { font-size: 2.8vh; color: var(--muted); margin-top: 1vh; }
+    #hero-empty { font-size: 4vh; color: var(--muted); }
+
+    .recent { background: var(--panel); border-radius: 2.4vh; padding: 1.6vh 1.4vw; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+    h2 { margin: 0 0 1vh; font-size: 2.4vh; color: var(--muted); font-weight: 700; }
+    .recent table { width: 100%; border-collapse: collapse; font-size: 3.4vh; }
+    .recent th { font-size: 1.8vh; color: var(--muted); font-weight: 600; text-align: left; padding-bottom: .6vh; border-bottom: .2vh solid var(--line); }
+    .recent td { padding: .7vh 0; border-bottom: .15vh solid var(--line); }
+    .recent td.q { font-weight: 800; color: var(--accent); letter-spacing: .05em; }
+    .recent td.c { font-weight: 700; }
+    .recent td.d { font-size: 2vh; color: var(--muted); }
+    .recent tr:first-child td { color: #fff; }
+    .recent tr:first-child td.q { color: var(--accent); }
+
+    #depts { display: grid; gap: 1.4vh 1.2vw; grid-template-columns: repeat(var(--cols, 3), 1fr); grid-auto-rows: 1fr; min-height: 0; }
+    .dept { background: var(--panel); border-radius: 2vh; padding: 1.2vh 1.1vw; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+    .dept-h { display: flex; align-items: baseline; gap: .6vw; border-bottom: .2vh solid var(--line); padding-bottom: .6vh; margin-bottom: .6vh; }
+    .dept-h b { font-size: 2.6vh; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dept-h span { font-size: 1.9vh; color: var(--muted); white-space: nowrap; }
+    .dept-h span em { font-style: normal; color: var(--accent); font-weight: 800; font-size: 2.4vh; }
+    .ctrs { display: grid; grid-template-columns: repeat(auto-fill, minmax(11vw, 1fr)); gap: .3vh .8vw; }
+    .ctr { display: flex; justify-content: space-between; align-items: center; font-size: 2.6vh; padding: .35vh .6vw; border-radius: 1vh; }
+    .ctr .n { color: var(--muted); font-size: 2vh; }
+    .ctr .v { font-weight: 800; letter-spacing: .05em; }
+    .ctr .v.idle { color: #5f8f84; font-weight: 600; font-size: 2vh; letter-spacing: 0; }
+    .ctr.hot { background: #047857; animation: flash 1s ease-in-out 6; }
+    .next { margin-top: auto; padding-top: .6vh; font-size: 1.9vh; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .next b { color: var(--ink); font-weight: 700; margin-left: .4vw; }
+
+    footer { background: #04211c; border-top: .2vh solid var(--line); padding: .9vh 0; overflow: hidden; white-space: nowrap; font-size: 2.3vh; }
+    #ticker { display: inline-block; padding-left: 100%; animation: ticker 28s linear infinite; }
+    @keyframes ticker { to { transform: translateX(-100%); } }
+
+    #start {
+      position: fixed; inset: 0; background: rgba(2, 20, 17, .92); display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 2vh; text-align: center; cursor: pointer; z-index: 10;
+    }
+    #start b { font-size: 4.6vh; }
+    #start span { font-size: 2.4vh; color: var(--muted); }
+    #start i { font-style: normal; font-size: 10vh; }
+    #err { position: fixed; left: 50%; bottom: 7vh; transform: translateX(-50%); background: #b91c1c; padding: 1vh 2vw; border-radius: 1.2vh; font-size: 2.2vh; }
+
+    @media (orientation: portrait) {
+      main { grid-template-rows: auto 1fr; }
+      .top { grid-template-columns: 1fr; }
+      #hero { padding: 3vh 2vw; }
+      #hero-q { font-size: 12vh; }
+      .recent { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <img id="logo" alt="" hidden />
+    <div class="brand"><b id="sys">ระบบจองคิวออนไลน์</b><span id="org"></span></div>
+    <div class="clock"><div id="clock">--:--</div><div id="today"></div></div>
+    <span id="net" title="การเชื่อมต่อ"></span>
+  </header>
+
+  <main>
+    <div class="top">
+      <section id="hero">
+        <div id="hero-empty">รอเรียกคิว</div>
+        <div id="hero-box" hidden>
+          <div class="hero-label">ขอเชิญหมายเลข</div>
+          <div id="hero-q"></div>
+          <div class="hero-to">ที่ <b>ช่องบริการ <span id="hero-c"></span></b></div>
+          <div id="hero-d"></div>
+        </div>
+      </section>
+      <section class="recent">
+        <h2>เรียกล่าสุด</h2>
+        <table><thead><tr><th>หมายเลข</th><th>ช่อง</th><th>แผนก</th></tr></thead><tbody id="recent"></tbody></table>
+      </section>
+    </div>
+    <section id="depts"></section>
+  </main>
+
+  <footer><span id="ticker"></span></footer>
+
+  <div id="start">
+    <i>🔊</i>
+    <b>แตะหน้าจอเพื่อเริ่มแสดงคิว</b>
+    <span>เปิดเสียงประกาศเรียกคิว และขยายเต็มจอ</span>
+  </div>
+  <div id="err" hidden></div>
+
+<script>
+const APP = {
+  API_URL: 'https://script.google.com/macros/s/AKfycbxsWhekn5r2CQQ552TU6foeP6ENDifmzCUt63Kl3GOO253Dq2aL0pIroqJVs9s85-Exzw/exec',
+};
+const P = new URLSearchParams(location.search);
+const OPT = {
+  depts: (P.get('depts') || '').replace(/[^A-Za-z0-9_,-]/g, ''),
+  voice: P.get('voice') !== '0',
+  sound: P.get('sound') !== '0',
+  poll: Math.max(3, parseInt(P.get('poll'), 10) || 4) * 1000,
+};
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+const st = { data: null, seen: null, queue: [], speaking: false, hero: null, hot: {}, started: false, fails: 0 };
+
+/* ------------------------------------------------------------------ นาฬิกา */
+function tick() {
+  const d = new Date();
+  $('clock').textContent = d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  $('today').textContent = d.toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+/* ------------------------------------------------------------------ ดึงข้อมูล */
+async function poll() {
+  try {
+    const url = APP.API_URL + '?action=display' + (OPT.depts ? '&depts=' + encodeURIComponent(OPT.depts) : '');
+    const r = await fetch(url, { cache: 'no-store' });
+    const j = await r.json();
+    if (!j || !j.ok) throw new Error((j && j.message) || 'โหลดข้อมูลไม่สำเร็จ');
+    st.fails = 0;
+    $('net').classList.remove('bad');
+    $('err').hidden = true;
+    apply(j.data);
+  } catch (e) {
+    st.fails++;
+    $('net').classList.add('bad');
+    if (st.fails >= 3) { $('err').textContent = 'ขาดการเชื่อมต่อ กำลังลองใหม่...'; $('err').hidden = false; }
+  } finally {
+    setTimeout(poll, OPT.poll);
+  }
+}
+
+const callKey = (c) => c.deptId + '|' + c.queueNo + '|' + c.counter + '|' + c.at;
+
+function apply(d) {
+  const first = !st.data;
+  st.data = d;
+  if (first) brand(d);
+  // คิวที่ถูกเรียกใหม่ (หรือเรียกซ้ำ) นับจากรอบก่อน → เข้าคิวประกาศ
+  const keys = d.calls.map(callKey);
+  if (st.seen) {
+    const fresh = d.calls.filter((c) => !st.seen.has(callKey(c))).reverse();   // เก่า → ใหม่
+    fresh.slice(-4).forEach((c) => announce(c));
+  } else if (d.calls[0]) {
+    showHero(d.calls[0], false);
+  }
+  st.seen = new Set(keys);
+  if (!d.calls.length) { st.hero = null; renderHero(); }
+  renderRecent();
+  renderDepts();
+}
+
+function brand(d) {
+  $('sys').textContent = d.systemName || 'ระบบจองคิวออนไลน์';
+  $('org').textContent = d.orgName || '';
+  document.title = 'จอแสดงคิว — ' + (d.orgName || d.systemName || '');
+  if (d.logoUrl) { $('logo').src = d.logoUrl; $('logo').hidden = false; $('logo').onerror = () => { $('logo').hidden = true; }; }
+  const msg = d.announcement || '';
+  $('ticker').textContent = msg;
+  document.querySelector('footer').hidden = !msg;
+  const n = d.depts.length;
+  $('depts').style.setProperty('--cols', n <= 2 ? n || 1 : n <= 4 ? 2 : n <= 6 ? 3 : 4);
+}
+
+/* ------------------------------------------------------------------ แสดงผล */
+function showHero(c, flash) {
+  st.hero = c;
+  renderHero();
+  if (flash) {
+    const h = $('hero');
+    h.classList.remove('flash'); void h.offsetWidth; h.classList.add('flash');
+    st.hot[c.deptId + '|' + c.counter] = Date.now();
+    renderDepts();
+  }
+}
+
+function renderHero() {
+  const c = st.hero;
+  $('hero-empty').hidden = !!c;
+  $('hero-box').hidden = !c;
+  if (!c) return;
+  $('hero-q').textContent = c.queueNo;
+  $('hero-c').textContent = c.counter;
+  const d = (st.data.depts || []).find((x) => x.id === c.deptId);
+  $('hero-d').textContent = (d ? d.icon + ' ' : '') + c.deptName;
+}
+
+function renderRecent() {
+  $('recent').innerHTML = st.data.calls.slice(0, 5).map((c) =>
+    `<tr><td class="q">${esc(c.queueNo)}</td><td class="c">${esc(c.counter)}</td><td class="d">${esc(c.deptName)}</td></tr>`).join('')
+    || '<tr><td colspan="3" class="d">ยังไม่มีการเรียกคิว</td></tr>';
+}
+
+function renderDepts() {
+  const now = Date.now();
+  $('depts').innerHTML = st.data.depts.map((d) => {
+    const by = {};
+    d.serving.forEach((s) => { if (!by[s.counter]) by[s.counter] = s.queueNo; });
+    const ctrs = (d.counterNos && d.counterNos.length ? d.counterNos : Object.keys(by)).map((n) => {
+      const hot = now - (st.hot[d.id + '|' + n] || 0) < 6000;
+      return `<div class="ctr${hot ? ' hot' : ''}"><span class="n">ช่อง ${esc(n)}</span>` +
+        (by[n] ? `<span class="v">${esc(by[n])}</span>` : '<span class="v idle">ว่าง</span>') + '</div>';
+    }).join('');
+    return `<div class="dept">
+      <div class="dept-h"><b>${esc(d.icon)} ${esc(d.name)}</b><span>รอ <em>${d.waiting}</em> คิว</span></div>
+      <div class="ctrs">${ctrs}</div>
+      <div class="next">คิวถัดไป${d.next.length ? d.next.map((q) => `<b>${esc(q)}</b>`).join('') : ' <b>—</b>'}</div>
+    </div>`;
+  }).join('');
+}
+
+/* ------------------------------------------------------------------ เสียงประกาศ */
+const TH_DIGIT = ['ศูนย์', 'หนึ่ง', 'สอง', 'สาม', 'สี่', 'ห้า', 'หก', 'เจ็ด', 'แปด', 'เก้า'];
+const TH_LETTER = { A: 'เอ', B: 'บี', C: 'ซี', D: 'ดี', E: 'อี', F: 'เอฟ', G: 'จี', H: 'เอช', I: 'ไอ', J: 'เจ', K: 'เค', L: 'แอล',
+  M: 'เอ็ม', N: 'เอ็น', O: 'โอ', P: 'พี', Q: 'คิว', R: 'อาร์', S: 'เอส', T: 'ที', U: 'ยู', V: 'วี', W: 'ดับเบิลยู', X: 'เอ็กซ์', Y: 'วาย', Z: 'แซด' };
+const spell = (s) => String(s).toUpperCase().split('').map((ch) => (/\d/.test(ch) ? TH_DIGIT[+ch] : TH_LETTER[ch] || ch)).join(' ');
+
+function announce(c) {
+  st.queue.push(c);
+  if (!st.speaking) nextAnnounce();
+}
+
+async function nextAnnounce() {
+  const c = st.queue.shift();
+  if (!c) { st.speaking = false; return; }
+  st.speaking = true;
+  showHero(c, true);
+  if (st.started && OPT.sound) {
+    await chime();
+    if (OPT.voice) {
+      const text = 'ขอเชิญหมายเลข ' + spell(c.queueNo) + ' ที่ช่องบริการ ' + spell(c.counter) + ' ค่ะ';
+      await speak(text);
+      await wait(600);
+      await speak(text);
+    }
+  }
+  await wait(1500);
+  nextAnnounce();
+}
+
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+let audioCtx = null;
+
+function chime() {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const t0 = audioCtx.currentTime;
+    [[784, 0], [659, 0.45]].forEach(([f, dt]) => {   // ติ๊ง-ต่อง
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = 'sine'; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t0 + dt);
+      g.gain.exponentialRampToValueAtTime(0.6, t0 + dt + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dt + 0.9);
+      o.connect(g).connect(audioCtx.destination);
+      o.start(t0 + dt); o.stop(t0 + dt + 1);
+    });
+  } catch (e) { /* ไม่มีเสียง */ }
+  return wait(1300);
+}
+
+let thVoice = null;
+function pickVoice() {
+  const vs = window.speechSynthesis ? speechSynthesis.getVoices() : [];
+  thVoice = vs.find((v) => /^th/i.test(v.lang)) || null;
+}
+
+function speak(text) {
+  return new Promise((resolve) => {
+    if (!window.speechSynthesis) return resolve();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'th-TH'; u.rate = 0.9;
+    if (thVoice) u.voice = thVoice;
+    const done = () => { clearTimeout(guard); resolve(); };
+    const guard = setTimeout(done, 9000);   // บางเครื่องไม่ส่ง onend
+    u.onend = done; u.onerror = done;
+    speechSynthesis.speak(u);
+  });
+}
+
+/* ------------------------------------------------------------------ เริ่มทำงาน */
+async function start() {
+  if (st.started) return;
+  st.started = true;
+  $('start').hidden = true;
+  try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); await audioCtx.resume(); } catch (e) {}
+  try { if (document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen(); } catch (e) {}
+  keepAwake();
+}
+
+let wakeLock = null;
+async function keepAwake() {
+  try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && st.started) keepAwake(); });
+
+$('start').addEventListener('click', start);
+document.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') start(); });
+if (window.speechSynthesis) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+if (!OPT.sound) $('start').querySelector('span').textContent = 'โหมดไม่มีเสียง · ขยายเต็มจอ';
+tick();
+setInterval(tick, 1000);
+setInterval(() => { if (st.data) renderDepts(); }, 2000);   // ล้างไฮไลต์ช่องที่เพิ่งเรียก
+poll();
+</script>
+</body>
+</html>
