@@ -85,7 +85,7 @@
           <table class="w-full text-sm">
             <thead class="text-slate-500 border-b">
               <tr class="text-right">
-                <th class="py-2 text-left">แผนก</th><th class="px-2">จอง</th><th class="px-2">เสร็จ</th><th class="px-2">รอ</th>
+                <th class="py-2 text-left">แผนก</th><th class="px-2">คิว</th><th class="px-2">เสร็จ</th><th class="px-2">รอ</th>
                 <th class="px-2">ไม่มา</th><th class="px-2 text-left w-40">ความคืบหน้า</th><th class="px-2 text-left">กำลังให้บริการ</th>
                 <th class="px-2">รอเฉลี่ย</th><th class="pl-2">บริการเฉลี่ย</th>
               </tr>
@@ -257,7 +257,7 @@ function renderLive(L) {
   const t = L.totals;
   $('live-date').textContent = thDate(L.date);
   $('live-kpis').innerHTML = [
-    kpi('จองวันนี้', fmt(t.booked), 'ยกเลิก ' + fmt(t.CANCELLED)),
+    kpi('คิววันนี้', fmt(t.booked), 'ออนไลน์ ' + fmt(t.booked - (t.walkin || 0)) + ' · walk-in ' + fmt(t.walkin || 0)),
     kpi('ให้บริการเสร็จ', fmt(t.DONE), '', 'good'),
     kpi('กำลังให้บริการ', fmt(t.CALLED)),
     kpi('รอเรียก', fmt(t.WAITING), t.overdue ? 'ถึงเวลานัดแล้ว ' + fmt(t.overdue) : '', t.overdue ? 'warn' : ''),
@@ -269,7 +269,7 @@ function renderLive(L) {
   $('live-rows').innerHTML = L.depts.map((d) => `
     <tr class="border-b last:border-0 text-right">
       <td class="py-2 text-left font-semibold whitespace-nowrap">${esc(d.icon)} ${esc(d.name)}</td>
-      <td class="px-2">${fmt(d.booked)}${d.dailyQuota ? `<span class="text-slate-400 text-xs">/${fmt(d.dailyQuota)}</span>` : ''}</td>
+      <td class="px-2">${fmt(d.booked)}${d.dailyQuota ? `<span class="text-slate-400 text-xs">/${fmt(d.dailyQuota)}</span>` : ''}${d.walkin ? `<div class="text-slate-400 text-xs">walk-in ${fmt(d.walkin)}</div>` : ''}</td>
       <td class="px-2 text-emerald-700 font-semibold">${fmt(d.DONE)}</td>
       <td class="px-2">${fmt(d.WAITING)}${d.overdue ? `<span class="text-amber-700 text-xs"> (${fmt(d.overdue)} เกินนัด)</span>` : ''}</td>
       <td class="px-2 ${d.NO_SHOW ? 'text-rose-700' : ''}">${fmt(d.NO_SHOW)}</td>
@@ -285,7 +285,7 @@ function renderSummary(S) {
   const s = S.service, v = S.survey, t = s.totals, q = v.totals;
   $('sum-label').textContent = s.label;
   $('sum-kpis').innerHTML = [
-    kpi('ยอดจอง', fmt(t.booked), 'ยกเลิก ' + fmt(t.CANCELLED)),
+    kpi('จำนวนคิว', fmt(t.booked), 'ออนไลน์ ' + fmt(t.booked - (t.walkin || 0)) + ' · walk-in ' + fmt(t.walkin || 0)),
     kpi('ให้บริการสำเร็จ', fmt1(t.serviceRate) + '%', fmt(t.DONE) + ' คิว', 'good'),
     kpi('ไม่มาตามนัด', fmt1(t.noShowRate) + '%', fmt(t.NO_SHOW) + ' คิว', t.noShowRate >= 15 ? 'bad' : ''),
     kpi('รอเฉลี่ย', fmt1(t.avgWaitMin), 'นาที นับจากเวลานัด'),
