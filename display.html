@@ -104,6 +104,11 @@
     #media { position: relative; background: #021512; border-radius: 2.4vh; overflow: hidden; min-height: 0; }
     #m-stage > * { position: absolute; left: 0; top: 0; width: 100%; height: 100%; border: 0; object-fit: contain; opacity: 0; transition: opacity .8s; }
     #m-stage > .on { opacity: 1; }
+    #m-stage > .ph { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2.4vh; text-align: center;
+                     background: radial-gradient(circle at 50% 40%, #0f4a40 0%, #021512 75%); }
+    #m-stage > .ph img { width: 34vh; height: 34vh; object-fit: contain; border-radius: 50%; background: #f1f5f9; padding: 1vh; position: static; opacity: 1; }
+    #m-stage > .ph b { font-size: 4vh; font-weight: 800; padding: 0 3vw; }
+    #m-stage > .ph span { font-size: 2.8vh; color: var(--muted); }
     #m-cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 2vh 1.6vw 1.4vh; font-size: 2.8vh; font-weight: 700;
              background: linear-gradient(transparent, rgba(0, 0, 0, .75)); }
     #callpop { position: absolute; inset: 0; background: rgba(4, 60, 48, .95); display: flex; flex-direction: column;
@@ -281,7 +286,7 @@ function showHero(c, flash) {
     h.classList.remove('flash'); void h.offsetWidth; h.classList.add('flash');
     st.hot[c.deptId + '|' + c.counter] = Date.now();
     renderDepts();
-    if (st.media.list.length) {   // มีสื่อ → แสดงเลขคิวทับสื่อชั่วคราว
+    if (OPT.media) {   // กรอบสื่อ → แสดงเลขคิวทับสื่อชั่วคราว
       $('cp-q').textContent = c.queueNo;
       $('cp-c').textContent = 'ที่ช่องบริการ ' + c.counter;
       $('cp-d').textContent = c.deptName;
@@ -301,12 +306,26 @@ function applyMedia(list) {
   if (key === st.media.key) return;
   st.media.key = key;
   st.media.list = list;
-  document.body.classList.toggle('with-media', list.length > 0);
-  $('media').hidden = !list.length;
+  // กรอบสื่อแสดงตลอดเวลา (ปิดได้ด้วย ?media=0) — ยังไม่มีสื่อ = แสดงโลโก้และข้อความต้อนรับ
+  document.body.classList.toggle('with-media', OPT.media);
+  $('media').hidden = !OPT.media;
   clearTimeout(st.media.timer);
   $('m-stage').innerHTML = '';
+  $('m-cap').hidden = true;
   st.media.i = -1;
   if (list.length) nextMedia();
+  else if (OPT.media) showPlaceholder();
+}
+
+function showPlaceholder() {
+  const d = st.data || {};
+  const el = document.createElement('div');
+  el.className = 'ph on';
+  el.innerHTML = (d.logoUrl ? `<img src="${esc(d.logoUrl)}" alt="">` : '') +
+    `<b>${esc(d.orgName || d.systemName || '')}</b><span>ยินดีให้บริการ · กรุณารอเรียกคิวตามหมายเลข</span>`;
+  const img = el.querySelector('img');
+  if (img) img.onerror = () => img.remove();
+  $('m-stage').appendChild(el);
 }
 
 function nextMedia() {
@@ -362,7 +381,7 @@ function renderHero() {
 }
 
 function renderRecent() {
-  $('recent').innerHTML = st.data.calls.slice(0, st.media.list.length ? 3 : 5).map((c) =>
+  $('recent').innerHTML = st.data.calls.slice(0, 5).map((c) =>
     `<tr><td class="q">${esc(c.queueNo)}</td><td class="c">${esc(c.counter)}</td><td class="d">${esc(c.deptName)}</td></tr>`).join('')
     || '<tr><td colspan="3" class="d">ยังไม่มีการเรียกคิว</td></tr>';
 }
