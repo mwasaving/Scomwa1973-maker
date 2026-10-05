@@ -14,6 +14,9 @@
       &voice=0          ปิดเสียงพูดประกาศ (ยังมีเสียงกริ่ง)
       &sound=0          ปิดเสียงทั้งหมด
       &poll=4           ความถี่ดึงข้อมูล (วินาที, ขั้นต่ำ 3)
+      &screen=LOBBY     ชื่อจอนี้ (ใช้กับคอลัมน์ Screens ในชีต Media เพื่อแสดงสื่อเฉพาะจอ)
+      &media=0          ไม่แสดงสื่อประชาสัมพันธ์บนจอนี้
+    สื่อประชาสัมพันธ์ (รูปภาพ / วิดีโอ / YouTube) จัดการในชีต Media — มีสื่อ = จอแบ่งเป็น สื่อ (ซ้าย) + คิว (ขวา)
   -->
   <style>
     :root {
@@ -97,12 +100,50 @@
     #start i { font-style: normal; font-size: 10vh; }
     #err { position: fixed; left: 50%; bottom: 7vh; transform: translateX(-50%); background: #b91c1c; padding: 1vh 2vw; border-radius: 1.2vh; font-size: 2.2vh; }
 
+    /* ---- สื่อประชาสัมพันธ์ (มีรายการในชีต Media) ---- */
+    #media { position: relative; background: #021512; border-radius: 2.4vh; overflow: hidden; min-height: 0; }
+    #m-stage > * { position: absolute; left: 0; top: 0; width: 100%; height: 100%; border: 0; object-fit: contain; opacity: 0; transition: opacity .8s; }
+    #m-stage > .on { opacity: 1; }
+    #m-cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 2vh 1.6vw 1.4vh; font-size: 2.8vh; font-weight: 700;
+             background: linear-gradient(transparent, rgba(0, 0, 0, .75)); }
+    #callpop { position: absolute; inset: 0; background: rgba(4, 60, 48, .95); display: flex; flex-direction: column;
+               align-items: center; justify-content: center; text-align: center; animation: popin .35s ease-out; }
+    @keyframes popin { from { opacity: 0; transform: scale(.94); } }
+    #callpop .l { font-size: 4vh; color: var(--muted); font-weight: 600; }
+    #cp-q { font-size: 24vh; line-height: 1; font-weight: 800; color: var(--accent); letter-spacing: .06em; }
+    #cp-c { font-size: 6.5vh; font-weight: 800; margin-top: 1vh; }
+    #cp-d { font-size: 3.4vh; color: var(--muted); margin-top: 1vh; }
+    body.with-media main { grid-template-columns: 1.75fr 1fr; grid-template-rows: auto auto 1fr; gap: 1.4vh 1.2vw; }
+    body.with-media .top { display: contents; }
+    body.with-media #media { grid-column: 1; grid-row: 1 / span 3; }
+    body.with-media #hero { grid-column: 2; grid-row: 1; padding: 1.6vh 1vw; }
+    body.with-media .hero-label, body.with-media #hero-empty { font-size: 2.6vh; }
+    body.with-media #hero-q { font-size: 11vh; }
+    body.with-media .hero-to { font-size: 3.4vh; }
+    body.with-media #hero-d { font-size: 2.2vh; margin-top: .6vh; }
+    body.with-media .recent { display: none; }   /* โหมดสื่อ: ช่องเรียกคิว + รายการแผนก แสดงคิวที่กำลังให้บริการครบแล้ว */
+    body.with-media #depts { grid-column: 2; grid-row: 2 / span 2; grid-template-columns: 1fr; grid-auto-rows: auto; align-content: start; gap: 1vh; overflow: hidden; }
+    body.with-media .dept { padding: .8vh .9vw; flex-direction: row; align-items: center; gap: .8vw; flex: none; }
+    body.with-media .dept-h { margin: 0; padding: 0; border: 0; flex: 1; min-width: 0; flex-direction: column; align-items: flex-start; gap: .2vh; }
+    body.with-media .dept-h b { font-size: 2.3vh; max-width: 100%; }
+    body.with-media .dept-h span { font-size: 1.8vh; }
+    body.with-media .ctrs { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .5vh .5vw; max-width: 60%; }
+    body.with-media .ctr.off { display: none; }
+    body.with-media .ctr { font-size: 2.1vh; padding: .2vh .6vw; gap: .6vw; background: var(--panel2); }
+    body.with-media .ctr .n { font-size: 1.7vh; }
+    body.with-media .ctr .v.idle { font-size: 1.7vh; }
+    body.with-media .next { display: none; }
+
     @media (orientation: portrait) {
       main { grid-template-rows: auto 1fr; }
       .top { grid-template-columns: 1fr; }
       #hero { padding: 3vh 2vw; }
       #hero-q { font-size: 12vh; }
       .recent { display: none; }
+      body.with-media main { grid-template-columns: 1fr; grid-template-rows: auto auto 1fr; }
+      body.with-media #media { grid-column: 1; grid-row: 1; aspect-ratio: 16 / 9; }
+      body.with-media #hero { grid-column: 1; grid-row: 2; }
+      body.with-media #depts { grid-column: 1; grid-row: 3; grid-template-columns: 1fr 1fr; }
     }
   </style>
 </head>
@@ -115,6 +156,16 @@
   </header>
 
   <main>
+    <section id="media" hidden>
+      <div id="m-stage"></div>
+      <div id="m-cap" hidden></div>
+      <div id="callpop" hidden>
+        <div class="l">ขอเชิญหมายเลข</div>
+        <div id="cp-q"></div>
+        <div id="cp-c"></div>
+        <div id="cp-d"></div>
+      </div>
+    </section>
     <div class="top">
       <section id="hero">
         <div id="hero-empty">รอเรียกคิว</div>
@@ -152,6 +203,8 @@ const OPT = {
   voice: P.get('voice') !== '0',
   sound: P.get('sound') !== '0',
   poll: Math.max(3, parseInt(P.get('poll'), 10) || 4) * 1000,
+  screen: (P.get('screen') || '').replace(/[^A-Za-z0-9_-]/g, ''),
+  media: P.get('media') !== '0',
 };
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -168,7 +221,8 @@ function tick() {
 /* ------------------------------------------------------------------ ดึงข้อมูล */
 async function poll() {
   try {
-    const url = APP.API_URL + '?action=display' + (OPT.depts ? '&depts=' + encodeURIComponent(OPT.depts) : '');
+    const url = APP.API_URL + '?action=display' + (OPT.depts ? '&depts=' + encodeURIComponent(OPT.depts) : '')
+      + (OPT.screen ? '&screen=' + encodeURIComponent(OPT.screen) : '');
     const r = await fetch(url, { cache: 'no-store' });
     const j = await r.json();
     if (!j || !j.ok) throw new Error((j && j.message) || 'โหลดข้อมูลไม่สำเร็จ');
@@ -191,6 +245,7 @@ function apply(d) {
   const first = !st.data;
   st.data = d;
   if (first) brand(d);
+  applyMedia(d.media);
   // คิวที่ถูกเรียกใหม่ (หรือเรียกซ้ำ) นับจากรอบก่อน → เข้าคิวประกาศ
   const keys = d.calls.map(callKey);
   if (st.seen) {
@@ -226,7 +281,73 @@ function showHero(c, flash) {
     h.classList.remove('flash'); void h.offsetWidth; h.classList.add('flash');
     st.hot[c.deptId + '|' + c.counter] = Date.now();
     renderDepts();
+    if (st.media.list.length) {   // มีสื่อ → แสดงเลขคิวทับสื่อชั่วคราว
+      $('cp-q').textContent = c.queueNo;
+      $('cp-c').textContent = 'ที่ช่องบริการ ' + c.counter;
+      $('cp-d').textContent = c.deptName;
+      $('callpop').hidden = false;
+      clearTimeout(st.popTimer);
+      st.popTimer = setTimeout(() => { $('callpop').hidden = true; }, 9000);
+    }
   }
+}
+
+/* ------------------------------------------------------------------ สื่อประชาสัมพันธ์ (ชีต Media) */
+st.media = { list: [], key: '', i: -1, timer: null };
+
+function applyMedia(list) {
+  list = OPT.media && Array.isArray(list) ? list : [];
+  const key = JSON.stringify(list);
+  if (key === st.media.key) return;
+  st.media.key = key;
+  st.media.list = list;
+  document.body.classList.toggle('with-media', list.length > 0);
+  $('media').hidden = !list.length;
+  clearTimeout(st.media.timer);
+  $('m-stage').innerHTML = '';
+  st.media.i = -1;
+  if (list.length) nextMedia();
+}
+
+function nextMedia() {
+  const L = st.media.list;
+  if (!L.length) return;
+  clearTimeout(st.media.timer);
+  st.media.i = (st.media.i + 1) % L.length;
+  const it = L[st.media.i];
+  const stage = $('m-stage');
+  let el;
+  if (it.kind === 'image') {
+    el = document.createElement('img');
+    el.alt = it.title || '';
+    el.onerror = skipMedia;
+    el.src = it.src;
+  } else if (it.kind === 'video') {
+    el = document.createElement('video');
+    el.muted = true; el.autoplay = true; el.playsInline = true; el.loop = L.length === 1;
+    el.onended = nextMedia;
+    el.onerror = skipMedia;
+    el.src = it.src;
+  } else {
+    const id = encodeURIComponent(it.src);
+    el = document.createElement('iframe');
+    el.allow = 'autoplay; encrypted-media';
+    el.src = 'https://www.youtube-nocookie.com/embed/' + id + '?autoplay=1&mute=1&controls=0&loop=1&playlist=' + id + '&playsinline=1&rel=0&modestbranding=1';
+  }
+  stage.appendChild(el);
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('on')));
+  [...stage.children].filter((x) => x !== el).forEach((x) => { x.classList.remove('on'); setTimeout(() => x.remove(), 900); });
+  $('m-cap').textContent = it.title || '';
+  $('m-cap').hidden = !it.title;
+  if (L.length > 1) {
+    // รูปภาพ/YouTube ตามจำนวนวินาที · วิดีโอเล่นจนจบ (ถ้ากำหนดวินาทีไว้จะตัดตามนั้น) — กันค้าง 15 นาที
+    const sec = it.seconds || (it.kind === 'video' ? 900 : 10);
+    st.media.timer = setTimeout(nextMedia, sec * 1000);
+  }
+}
+
+function skipMedia() {
+  if (st.media.list.length > 1) { clearTimeout(st.media.timer); st.media.timer = setTimeout(nextMedia, 1500); }
 }
 
 function renderHero() {
@@ -241,7 +362,7 @@ function renderHero() {
 }
 
 function renderRecent() {
-  $('recent').innerHTML = st.data.calls.slice(0, 5).map((c) =>
+  $('recent').innerHTML = st.data.calls.slice(0, st.media.list.length ? 3 : 5).map((c) =>
     `<tr><td class="q">${esc(c.queueNo)}</td><td class="c">${esc(c.counter)}</td><td class="d">${esc(c.deptName)}</td></tr>`).join('')
     || '<tr><td colspan="3" class="d">ยังไม่มีการเรียกคิว</td></tr>';
 }
@@ -253,7 +374,7 @@ function renderDepts() {
     d.serving.forEach((s) => { if (!by[s.counter]) by[s.counter] = s.queueNo; });
     const ctrs = (d.counterNos && d.counterNos.length ? d.counterNos : Object.keys(by)).map((n) => {
       const hot = now - (st.hot[d.id + '|' + n] || 0) < 6000;
-      return `<div class="ctr${hot ? ' hot' : ''}"><span class="n">ช่อง ${esc(n)}</span>` +
+      return `<div class="ctr${hot ? ' hot' : ''}${by[n] ? '' : ' off'}"><span class="n">ช่อง ${esc(n)}</span>` +
         (by[n] ? `<span class="v">${esc(by[n])}</span>` : '<span class="v idle">ว่าง</span>') + '</div>';
     }).join('');
     return `<div class="dept">
