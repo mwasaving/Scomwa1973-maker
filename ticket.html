@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="robots" content="noindex" />
+  <title>บัตรคิวของฉัน</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <!--
+    หน้าติดตามบัตรคิว walk-in (เปิดจาก QR บนบัตรคิวของตู้)
+    - ?t=<token> → แสดงสถานะคิวสด (ไม่ต้องล็อกอิน)
+    - ถ้าตั้ง WALKIN_LIFF_ID (LIFF ที่ endpoint = หน้านี้) → กดผูกกับ LINE เพื่อรับข้อความเมื่อถึงคิว
+  -->
+  <style>
+    :root { --brand: #047857; --ink: #0f172a; --muted: #64748b; }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body { margin: 0; font-family: 'Sarabun', system-ui, sans-serif; background: #f1f5f9; color: var(--ink); min-height: 100vh; }
+    header { display: flex; align-items: center; gap: 10px; padding: 12px 16px; color: #fff; background: linear-gradient(90deg, #047857, #0f766e); }
+    #logo { width: 38px; height: 38px; border-radius: 50%; background: #fff; padding: 2px; object-fit: contain; }
+    header b { font-size: 16px; display: block; }
+    header span { font-size: 12px; opacity: .9; }
+    main { max-width: 460px; margin: 0 auto; padding: 16px; }
+    .card { background: #fff; border-radius: 22px; box-shadow: 0 2px 8px rgba(15, 23, 42, .08); padding: 22px 18px; text-align: center; margin-bottom: 14px; }
+    .dn { font-weight: 700; color: var(--brand); font-size: 18px; }
+    .lbl { color: var(--muted); font-size: 14px; margin-top: 6px; }
+    #q { font-size: 76px; font-weight: 800; letter-spacing: .05em; line-height: 1.05; }
+    #state { display: inline-block; margin-top: 8px; padding: 6px 14px; border-radius: 99px; font-weight: 700; font-size: 16px; background: #fef3c7; color: #92400e; }
+    .grid { display: flex; justify-content: center; gap: 26px; margin-top: 14px; }
+    .grid b { display: block; font-size: 26px; }
+    .grid span { font-size: 13px; color: var(--muted); }
+    #serving { font-size: 15px; color: var(--muted); margin-top: 12px; }
+    #serving b { color: var(--ink); }
+    .called { background: #047857 !important; color: #fff; animation: pulse 1s ease-in-out 8; }
+    .called .dn, .called .lbl, .called #serving, .called .grid span { color: #d1fae5; }
+    @keyframes pulse { 50% { transform: scale(1.02); } }
+    #callbox { font-size: 26px; font-weight: 800; margin-top: 10px; }
+    .line { background: #fff; border-radius: 18px; padding: 16px; text-align: center; font-size: 15px; }
+    .btn { display: inline-block; margin-top: 8px; border: 0; border-radius: 14px; padding: 12px 22px; font: inherit; font-weight: 700; font-size: 17px; background: #06c755; color: #fff; }
+    .note { font-size: 13px; color: var(--muted); text-align: center; margin-top: 14px; line-height: 1.5; }
+    #err { background: #fff1f2; color: #be123c; border-radius: 16px; padding: 18px; text-align: center; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <header>
+    <img id="logo" alt="" hidden />
+    <div><b id="sys">บัตรคิวของฉัน</b><span id="org"></span></div>
+  </header>
+  <main>
+    <div id="err" hidden></div>
+    <div id="box" hidden>
+      <div class="card" id="card">
+        <div class="dn" id="dept"></div>
+        <div class="lbl">หมายเลขคิว</div>
+        <div id="q"></div>
+        <div id="state"></div>
+        <div id="callbox" hidden></div>
+        <div class="grid" id="grid">
+          <div><b id="ahead">-</b><span>คิวก่อนหน้า</span></div>
+          <div><b id="slot">-</b><span>ช่วงเวลา</span></div>
+        </div>
+        <div id="serving"></div>
+      </div>
+      <div class="line" id="line" hidden></div>
+      <p class="note">หน้านี้อัปเดตเองทุก 10 วินาที · เปิดค้างไว้และเปิดเสียงโทรศัพท์<br>คิวจองออนไลน์ในช่วงเวลาเดียวกันจะได้รับบริการก่อน</p>
+    </div>
+  </main>
+
+<script>
+const APP = {
+  API_URL: 'https://script.google.com/macros/s/AKfycbxsWhekn5r2CQQ552TU6foeP6ENDifmzCUt63Kl3GOO253Dq2aL0pIroqJVs9s85-Exzw/exec',
+  POLL_MS: 10000,
+};
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const STATE = { WAITING: 'รอเรียก', CALLED: 'ถึงคิวแล้ว', DONE: 'ใช้บริการเสร็จแล้ว', NO_SHOW: 'ไม่มาตามเรียก', CANCELLED: 'ยกเลิกแล้ว' };
+
+// token มาจาก ?t= หรือจาก liff.state (กรณีเปิดผ่าน liff.line.me/<id>?t=...)
+function readToken() {
+  const p = new URLSearchParams(location.search);
+  if (p.get('t')) return p.get('t');
+  const s = p.get('liff.state');
+  if (s) { const q = new URLSearchParams(decodeURIComponent(s).replace(/^[^?]*\?/, '')); if (q.get('t')) return q.get('t'); }
+  return '';
+}
+const T = readToken();
+const st = { data: null, lastCall: '', liffReady: false, linking: false };
+
+async function api(action, data) {
+  let res;
+  try {
+    const r = await fetch(APP.API_URL, { method: 'POST', body: JSON.stringify(Object.assign({ action }, data || {})), redirect: 'follow' });
+    res = await r.json();
+  } catch (e) { const er = new Error('เชื่อมต่อระบบไม่ได้'); er.code = 'NETWORK'; throw er; }
+  if (!res || !res.ok) { const e = new Error((res && res.message) || 'เกิดข้อผิดพลาด'); e.code = res && res.code; throw e; }
+  return res.data;
+}
+
+async function poll() {
+  try {
+    const d = await api('ticket', { t: T });
+    st.data = d;
+    render(d);
+    if (d.liffId && !d.linked) setupLine(d.liffId);
+  } catch (e) {
+    if (e.code !== 'NETWORK') { $('box').hidden = true; $('err').textContent = e.message; $('err').hidden = false; return; }
+  }
+  setTimeout(poll, APP.POLL_MS);
+}
+
+function render(d) {
+  $('err').hidden = true; $('box').hidden = false;
+  $('sys').textContent = d.systemName || 'บัตรคิวของฉัน';
+  $('org').textContent = d.orgName || '';
+  if (d.logoUrl && $('logo').hidden) { $('logo').src = d.logoUrl; $('logo').hidden = false; $('logo').onerror = () => { $('logo').hidden = true; }; }
+  $('dept').textContent = (d.deptIcon || '') + ' ' + d.deptName;
+  $('q').textContent = d.queueNo;
+  $('state').textContent = STATE[d.status] || d.status;
+  $('ahead').textContent = d.status === 'WAITING' ? d.ahead : '-';
+  $('slot').textContent = (d.slotLabel || '-').replace(/\s*น\.$/, '');
+  $('serving').innerHTML = d.nowServing.length
+    ? 'กำลังให้บริการ: ' + d.nowServing.map((s) => `<b>${esc(s.queueNo)}</b> (ช่อง ${esc(s.counter)})`).join(', ')
+    : (d.counterNos.length ? 'ให้บริการที่ช่อง ' + esc(d.counterNos.join(', ')) : '');
+  const called = d.status === 'CALLED';
+  $('card').classList.toggle('called', called);
+  $('grid').hidden = called;
+  $('callbox').hidden = !called;
+  if (called) {
+    $('callbox').textContent = 'เชิญที่ช่องบริการ ' + d.counter;
+    if (d.calledAt && d.calledAt !== st.lastCall) { st.lastCall = d.calledAt; alertMe(); }
+  }
+  document.title = (called ? '🔔 ' : '') + d.queueNo + ' — บัตรคิวของฉัน';
+  if (d.linked && st.data) $('line').hidden = true;
+}
+
+function alertMe() {
+  try { navigator.vibrate && navigator.vibrate([400, 200, 400, 200, 400]); } catch (e) {}
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [[784, 0], [659, 0.45]].forEach(([f, dt]) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.frequency.value = f; g.gain.setValueAtTime(0.5, ctx.currentTime + dt); g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dt + 0.9);
+      o.connect(g).connect(ctx.destination); o.start(ctx.currentTime + dt); o.stop(ctx.currentTime + dt + 1);
+    });
+  } catch (e) {}
+}
+
+/* ------------------------------------------------------------------ ผูกกับ LINE (เฉพาะเมื่อตั้ง WALKIN_LIFF_ID) */
+function loadLiffSdk() {
+  return new Promise((ok, fail) => {
+    if (window.liff) return ok();
+    const s = document.createElement('script');
+    s.src = 'https://static.line-scdn.net/liff/edge/2/sdk.js';
+    s.onload = ok; s.onerror = fail;
+    document.head.appendChild(s);
+  });
+}
+
+async function setupLine(liffId) {
+  if (st.liffReady || st.linking) return;
+  st.linking = true;
+  const box = $('line');
+  try {
+    await loadLiffSdk();
+    await liff.init({ liffId });
+    st.liffReady = true;
+    if (!liff.isLoggedIn()) {
+      box.innerHTML = '🔔 รับข้อความแจ้งเตือนทาง LINE เมื่อถึงคิว<br><button class="btn" id="btn-line">เชื่อมต่อ LINE</button>';
+      box.hidden = false;
+      $('btn-line').onclick = () => liff.login({ redirectUri: location.href });
+      return;
+    }
+    const auth = await api('auth', { idToken: liff.getIDToken() });
+    await api('claimTicket', { session: auth.session, t: T });
+    box.innerHTML = '✅ เชื่อมต่อ LINE แล้ว — จะได้รับข้อความเมื่อถึงคิว<br><span style="color:#64748b;font-size:13px">ต้องเป็นเพื่อนกับ LINE ของสหกรณ์จึงจะได้รับข้อความ</span>';
+    box.hidden = false;
+  } catch (e) {
+    box.textContent = 'เชื่อมต่อ LINE ไม่สำเร็จ: ' + (e.message || e) + ' (ยังติดตามคิวในหน้านี้ได้ตามปกติ)';
+    box.hidden = false;
+  } finally {
+    st.linking = false;
+  }
+}
+
+if (!T) { $('err').textContent = 'ไม่พบข้อมูลบัตรคิว กรุณาสแกน QR บนบัตรคิวอีกครั้ง'; $('err').hidden = false; }
+else poll();
+</script>
+</body>
+</html>
