@@ -75,6 +75,7 @@
           <button data-tab="call" class="tab px-3 py-1.5 rounded-lg">📢 เรียกคิว</button>
           <button data-tab="dash" class="tab admin-only px-3 py-1.5 rounded-lg">📊 ภาพรวม</button>
           <button data-tab="report" class="tab admin-only px-3 py-1.5 rounded-lg">📈 รายงาน</button>
+          <button data-tab="media" class="tab admin-only px-3 py-1.5 rounded-lg">🖼️ สื่อจอแสดงคิว</button>
           <button data-tab="settings" class="tab admin-only px-3 py-1.5 rounded-lg">⚙️ ตั้งค่า</button>
           <a href="https://mwasaving.github.io/Scomwa1973-maker/exec.html" target="_blank" rel="noopener" class="admin-only px-3 py-1.5 rounded-lg hover:bg-white/15">🏛️ ผู้บริหาร</a>
           <a href="https://mwasaving.github.io/Scomwa1973-maker/display.html" target="_blank" rel="noopener" class="px-3 py-1.5 rounded-lg hover:bg-white/15">📺 จอแสดงคิว</a>
@@ -203,6 +204,71 @@
           </div>
         </div>
         <div id="report-doc"><p class="text-center text-slate-400 py-10">เลือกเงื่อนไขแล้วกด "ดูรายงาน"</p></div>
+      </section>
+
+      <!-- ===== Tab: สื่อจอแสดงคิว ===== -->
+      <section id="tab-media" class="space-y-4" hidden>
+        <div class="bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl p-3 text-sm">
+          สื่อที่ <b>เปิดแสดง</b> จะวนแสดงในกรอบสี่เหลี่ยมของจอแสดงคิวตามลำดับ · บันทึกแล้วจอทีวีเปลี่ยนตามภายในไม่กี่วินาที ·
+          ไฟล์ที่อัปโหลดเก็บใน Google Drive ของสหกรณ์ (ไม่ต้องตั้งค่าแชร์)
+          <a href="https://mwasaving.github.io/Scomwa1973-maker/display.html" target="_blank" rel="noopener" class="underline font-semibold ml-1">เปิดจอแสดงคิว ↗</a>
+        </div>
+
+        <div class="bg-white rounded-3xl shadow-sm p-5 space-y-4">
+          <h3 class="font-bold">➕ เพิ่มสื่อขึ้นจอ</h3>
+          <div id="m-kinds" class="flex flex-wrap gap-2 text-sm">
+            <button data-kind="image" class="px-4 py-2 rounded-xl font-semibold">📷 รูปภาพ</button>
+            <button data-kind="video" class="px-4 py-2 rounded-xl font-semibold">🎬 วิดีโอ</button>
+            <button data-kind="youtube" class="px-4 py-2 rounded-xl font-semibold">▶️ YouTube</button>
+            <button data-kind="link" class="px-4 py-2 rounded-xl font-semibold">🔗 ลิงก์รูป/วิดีโอ</button>
+          </div>
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="space-y-3">
+              <label id="m-file-wrap" class="block">
+                <span id="m-file-label" class="text-sm text-slate-600">เลือกไฟล์</span>
+                <input id="m-file" type="file" class="mt-1 block w-full text-sm file:mr-3 file:rounded-xl file:border-0 file:bg-emerald-600 file:px-4 file:py-2 file:font-semibold file:text-white">
+                <span id="m-file-note" class="text-xs text-slate-500"></span>
+              </label>
+              <label id="m-url-wrap" class="block" hidden>
+                <span id="m-url-label" class="text-sm text-slate-600">ลิงก์</span>
+                <input id="m-url" type="url" placeholder="https://" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2">
+              </label>
+              <label id="m-linktype-wrap" class="block" hidden>
+                <span class="text-sm text-slate-600">ลิงก์นี้เป็น</span>
+                <select id="m-linktype" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2"><option value="image">รูปภาพ</option><option value="video">วิดีโอ (.mp4)</option></select>
+              </label>
+              <label class="block"><span class="text-sm text-slate-600">ข้อความบรรยายใต้ภาพ (ไม่บังคับ)</span>
+                <input id="m-title" maxlength="120" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" placeholder="เช่น ประกาศเงินปันผลประจำปี"></label>
+            </div>
+            <div class="space-y-3">
+              <div class="grid grid-cols-2 gap-3">
+                <label class="block"><span class="text-sm text-slate-600">แสดงนาน (วินาที)</span>
+                  <input id="m-seconds" type="number" min="0" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2">
+                  <span id="m-seconds-note" class="text-xs text-slate-500"></span></label>
+                <label class="block"><span class="text-sm text-slate-600">จอที่แสดง (ว่าง = ทุกจอ)</span>
+                  <input id="m-screens" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" placeholder="เช่น LOBBY"></label>
+                <label class="block"><span class="text-sm text-slate-600">เริ่มแสดงวันที่</span>
+                  <input id="m-start" type="date" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2"></label>
+                <label class="block"><span class="text-sm text-slate-600">แสดงถึงวันที่</span>
+                  <input id="m-end" type="date" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2"></label>
+              </div>
+              <label class="flex items-center gap-2 text-sm font-semibold"><input id="m-active" type="checkbox" checked class="w-5 h-5 accent-emerald-600"> เปิดแสดงทันที</label>
+              <div id="m-preview" class="relative rounded-2xl bg-slate-900 aspect-video overflow-hidden flex items-center justify-center text-slate-400 text-sm">ตัวอย่าง</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-3">
+            <button id="m-add" class="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold rounded-xl px-6 py-3">➕ เพิ่มขึ้นจอ</button>
+            <span id="m-status" class="text-sm text-slate-500"></span>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-3xl shadow-sm p-5">
+          <div class="flex items-center gap-2 mb-3">
+            <h3 class="font-bold mr-auto">รายการสื่อ <span id="m-count" class="font-normal text-slate-500 text-sm"></span></h3>
+            <button id="m-reload" class="text-sm bg-slate-100 hover:bg-slate-200 rounded-lg px-3 py-1.5">↻ โหลดใหม่</button>
+          </div>
+          <div id="m-list" class="grid md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+        </div>
       </section>
 
       <!-- ===== Tab: ตั้งค่า ===== -->
@@ -383,9 +449,10 @@ function fillCounters() {
 function showTab(tab) {
   state.tab = tab;
   document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('tab-on', b.dataset.tab === tab));
-  ['call', 'dash', 'report', 'settings'].forEach((t) => { $('tab-' + t).hidden = t !== tab; });
+  ['call', 'dash', 'report', 'media', 'settings'].forEach((t) => { $('tab-' + t).hidden = t !== tab; });
   if (tab === 'call') startPolling(); else stopPolling();
   if (tab === 'dash') loadDashboard();
+  if (tab === 'media') loadMedia();
   if (tab === 'settings') loadSettings();
 }
 
@@ -538,6 +605,189 @@ async function loadDashboard() {
       </div>`).join('');
   } catch (e) {
     $('dash-depts').innerHTML = `<p class="text-rose-600">${esc(e.message)}</p>`;
+  }
+}
+
+/* ------------------------------------------------------------------ สื่อจอแสดงคิว (รูป / วิดีโอ / YouTube) */
+const MEDIA_KIND = {
+  image:   { label: 'รูปภาพ', icon: '📷', accept: 'image/jpeg,image/png,image/gif,image/webp', sec: 10, note: 'รูปแนวนอน 16:9 (เช่น 1920×1080) จะเต็มกรอบพอดี' },
+  video:   { label: 'วิดีโอ', icon: '🎬', accept: 'video/mp4,video/webm', sec: 0, note: 'ไฟล์ MP4 · วิดีโอเล่นแบบปิดเสียง · วิดีโอยาวแนะนำให้ลง YouTube' },
+  youtube: { label: 'YouTube', icon: '▶️', sec: 60 },
+  link:    { label: 'ลิงก์', icon: '🔗', sec: 10 },
+};
+const mstate = { kind: 'image', items: [], maxMB: { image: 8, video: 20 }, busy: false, previewUrl: '' };
+const ytId = (u) => (String(u).match(/(?:youtube\.com\/(?:watch\?(?:[^#]*&)?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([\w-]{11})/) || [])[1] || '';
+
+function setMediaKind(kind) {
+  mstate.kind = kind;
+  const k = MEDIA_KIND[kind];
+  document.querySelectorAll('#m-kinds [data-kind]').forEach((b) => {
+    b.className = 'px-4 py-2 rounded-xl font-semibold ' + (b.dataset.kind === kind ? 'bg-emerald-600 text-white' : 'bg-slate-100 hover:bg-slate-200');
+  });
+  const upload = kind === 'image' || kind === 'video';
+  $('m-file-wrap').hidden = !upload;
+  $('m-url-wrap').hidden = upload;
+  $('m-linktype-wrap').hidden = kind !== 'link';
+  if (upload) {
+    $('m-file').accept = k.accept;
+    $('m-file').value = '';
+    $('m-file-label').textContent = 'เลือกไฟล์' + k.label + 'จากเครื่อง';
+    $('m-file-note').textContent = k.note + ' · ขนาดไม่เกิน ' + mstate.maxMB[kind] + ' MB';
+  } else {
+    $('m-url-label').textContent = kind === 'youtube' ? 'ลิงก์วิดีโอ YouTube' : 'ลิงก์รูปภาพหรือวิดีโอ (https://...)';
+    $('m-url').placeholder = kind === 'youtube' ? 'https://www.youtube.com/watch?v=...' : 'https://';
+  }
+  $('m-seconds').value = k.sec;
+  $('m-seconds-note').textContent = kind === 'video' ? '0 = เล่นจนจบ' : kind === 'youtube' ? 'วิดีโอ YouTube ตัดตามวินาทีนี้' : '';
+  mediaPreview();
+}
+
+function mediaPreview() {
+  const box = $('m-preview');
+  if (mstate.previewUrl) { URL.revokeObjectURL(mstate.previewUrl); mstate.previewUrl = ''; }
+  const k = mstate.kind;
+  if (k === 'image' || k === 'video') {
+    const f = $('m-file').files[0];
+    if (!f) { box.textContent = 'ยังไม่ได้เลือกไฟล์'; return; }
+    mstate.previewUrl = URL.createObjectURL(f);
+    box.innerHTML = k === 'image' ? `<img src="${mstate.previewUrl}" class="absolute inset-0 w-full h-full object-contain">`
+      : `<video src="${mstate.previewUrl}" muted autoplay loop playsinline class="absolute inset-0 w-full h-full object-contain"></video>`;
+    return;
+  }
+  const u = $('m-url').value.trim();
+  if (k === 'youtube') {
+    const id = ytId(u);
+    box.innerHTML = id ? `<img src="https://i.ytimg.com/vi/${id}/hqdefault.jpg" class="absolute inset-0 w-full h-full object-cover">` : 'วางลิงก์ YouTube';
+  } else if (/^https:\/\//.test(u)) {
+    box.innerHTML = $('m-linktype').value === 'video' ? `<video src="${esc(u)}" muted autoplay loop playsinline class="absolute inset-0 w-full h-full object-contain"></video>`
+      : `<img src="${esc(u)}" class="absolute inset-0 w-full h-full object-contain">`;
+  } else box.textContent = 'วางลิงก์ที่ขึ้นต้นด้วย https://';
+}
+
+const readBase64 = (file) => new Promise((resolve, reject) => {
+  const r = new FileReader();
+  r.onload = () => resolve(String(r.result).split(',')[1] || '');
+  r.onerror = () => reject(new Error('อ่านไฟล์ไม่สำเร็จ'));
+  r.readAsDataURL(file);
+});
+
+async function addMedia() {
+  if (mstate.busy) return;
+  const k = mstate.kind;
+  const item = {
+    title: $('m-title').value.trim(), seconds: $('m-seconds').value, screens: $('m-screens').value.trim(),
+    startDate: $('m-start').value, endDate: $('m-end').value, active: $('m-active').checked,
+  };
+  mstate.busy = true; $('m-add').disabled = true;
+  try {
+    if (k === 'image' || k === 'video') {
+      const f = $('m-file').files[0];
+      if (!f) throw new Error('กรุณาเลือกไฟล์');
+      if (f.size > mstate.maxMB[k] * 1048576) throw new Error(MEDIA_KIND[k].label + 'ต้องไม่เกิน ' + mstate.maxMB[k] + ' MB (ไฟล์นี้ ' + (f.size / 1048576).toFixed(1) + ' MB)');
+      $('m-status').textContent = '⏳ กำลังอัปโหลด ' + f.name + ' (' + (f.size / 1048576).toFixed(1) + ' MB)...';
+      const up = await api('adminMediaUpload', { name: f.name, mime: f.type, data: await readBase64(f) });
+      Object.assign(item, { url: up.url, type: up.kind });
+      if (!item.title) item.title = '';
+    } else {
+      const u = $('m-url').value.trim();
+      if (k === 'youtube' && !ytId(u)) throw new Error('ลิงก์ YouTube ไม่ถูกต้อง');
+      if (!/^https:\/\//.test(u)) throw new Error('ลิงก์ต้องขึ้นต้นด้วย https://');
+      Object.assign(item, { url: u, type: k === 'youtube' ? 'youtube' : $('m-linktype').value });
+    }
+    $('m-status').textContent = '⏳ กำลังบันทึก...';
+    await api('adminMediaSave', item);
+    toast('เพิ่มสื่อขึ้นจอแล้ว');
+    $('m-file').value = ''; $('m-url').value = ''; $('m-title').value = '';
+    mediaPreview();
+    await loadMedia();
+  } catch (e) {
+    toast(e.message, 'error');
+  } finally {
+    mstate.busy = false; $('m-add').disabled = false; $('m-status').textContent = '';
+  }
+}
+
+async function loadMedia() {
+  if (!mstate.inited) { mstate.inited = true; setMediaKind('image'); }
+  $('m-list').innerHTML = '<p class="text-slate-400">กำลังโหลด...</p>';
+  try {
+    const d = await api('adminMediaList');
+    mstate.items = d.items;
+    if (d.maxMB) { mstate.maxMB = d.maxMB; if (mstate.kind === 'image' || mstate.kind === 'video') setMediaKind(mstate.kind); }
+    renderMediaList();
+  } catch (e) {
+    $('m-list').innerHTML = `<p class="text-rose-600">${esc(e.message)}</p>`;
+  }
+}
+
+function mediaStatus(it) {
+  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Bangkok' });
+  if (!it.valid) return ['ลิงก์ไม่ถูกต้อง', 'bg-rose-100 text-rose-700'];
+  if (!it.active) return ['ปิดอยู่', 'bg-slate-100 text-slate-500'];
+  if (it.startDate && it.startDate > today) return ['รอถึงวันเริ่ม', 'bg-amber-100 text-amber-800'];
+  if (it.endDate && it.endDate < today) return ['หมดช่วงแสดง', 'bg-slate-100 text-slate-500'];
+  return ['● กำลังแสดง', 'bg-emerald-100 text-emerald-800'];
+}
+
+function renderMediaList() {
+  const L = mstate.items;
+  const showing = L.filter((it) => mediaStatus(it)[0] === '● กำลังแสดง').length;
+  $('m-count').textContent = L.length ? `(${L.length} รายการ · กำลังแสดง ${showing})` : '';
+  if (!L.length) { $('m-list').innerHTML = '<p class="text-slate-400">ยังไม่มีสื่อ — จอแสดงคิวจะแสดงโลโก้และข้อความต้อนรับแทน</p>'; return; }
+  $('m-list').innerHTML = L.map((it, i) => {
+    const [st, cls] = mediaStatus(it);
+    const k = MEDIA_KIND[it.kind] || MEDIA_KIND.link;
+    const thumb = it.kind === 'youtube' ? `<img src="https://i.ytimg.com/vi/${esc(it.src)}/mqdefault.jpg" class="absolute inset-0 w-full h-full object-cover">`
+      : it.kind === 'image' ? `<img src="${esc(it.src)}" class="absolute inset-0 w-full h-full object-contain" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'📷 รูปภาพ',className:'text-3xl'}))">`
+      : '<span class="text-4xl">🎬</span>';
+    const inp = (f, v, extra) => `<input data-f="${f}" value="${esc(v)}" ${extra || ''} class="mt-0.5 w-full rounded-lg border border-slate-300 px-2 py-1 text-sm">`;
+    return `<div data-i="${i}" class="rounded-2xl border border-slate-200 overflow-hidden flex flex-col">
+      <div class="relative bg-slate-900 aspect-video flex items-center justify-center text-slate-300">${thumb}
+        <span class="absolute top-2 left-2 text-xs font-bold rounded-full px-2 py-0.5 ${cls}">${st}</span>
+        <span class="absolute top-2 right-2 text-xs font-bold rounded-full px-2 py-0.5 bg-black/60 text-white">${k.icon} ${k.label}</span>
+        <a href="${esc(it.url)}" target="_blank" rel="noopener" class="absolute bottom-2 right-2 text-xs rounded-full px-2 py-0.5 bg-black/60 text-white">เปิดไฟล์ ↗</a>
+      </div>
+      <div class="p-3 space-y-2 text-xs text-slate-500">
+        <label class="block">ข้อความบรรยาย ${inp('title', it.title, 'maxlength="120"')}</label>
+        <div class="grid grid-cols-3 gap-2">
+          <label>วินาที ${inp('seconds', it.seconds, 'type="number" min="0"')}</label>
+          <label>ลำดับ ${inp('sortOrder', it.sortOrder, 'type="number"')}</label>
+          <label>จอ ${inp('screens', it.screens, 'placeholder="ทุกจอ"')}</label>
+          <label class="col-span-3 grid grid-cols-2 gap-2"><span>ตั้งแต่ ${inp('startDate', it.startDate, 'type="date"')}</span><span>ถึง ${inp('endDate', it.endDate, 'type="date"')}</span></label>
+        </div>
+        <div class="flex items-center gap-2 pt-1">
+          <label class="flex items-center gap-1.5 text-sm font-semibold text-slate-700 mr-auto"><input data-f="active" type="checkbox" ${it.active ? 'checked' : ''} class="w-5 h-5 accent-emerald-600"> เปิดแสดง</label>
+          <button data-m="save" class="text-sm font-semibold rounded-lg px-3 py-1.5 bg-emerald-600 text-white">บันทึก</button>
+          <button data-m="del" class="text-sm font-semibold rounded-lg px-3 py-1.5 bg-rose-50 text-rose-700">ลบ</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function mediaAction(btn) {
+  const card = btn.closest('[data-i]');
+  const it = mstate.items[+card.dataset.i];
+  const val = (f) => { const el = card.querySelector(`[data-f="${f}"]`); return el.type === 'checkbox' ? el.checked : el.value.trim(); };
+  btn.disabled = true;
+  try {
+    if (btn.dataset.m === 'del') {
+      if (!confirm('ลบสื่อ "' + (it.title || (MEDIA_KIND[it.kind] || {}).label || 'รายการนี้') + '" ออกจากจอ?' +
+        (it.fileId ? '\n(ไฟล์ที่อัปโหลดจะย้ายไปถังขยะของ Drive)' : ''))) { btn.disabled = false; return; }
+      await api('adminMediaDelete', { row: it.row, url: it.url });
+      toast('ลบแล้ว');
+    } else {
+      await api('adminMediaSave', {
+        row: it.row, origUrl: it.url, url: it.url, type: it.type || it.kind,
+        title: val('title'), seconds: val('seconds'), sortOrder: val('sortOrder'), screens: val('screens'),
+        startDate: val('startDate'), endDate: val('endDate'), active: val('active'),
+      });
+      toast('บันทึกแล้ว');
+    }
+    await loadMedia();
+  } catch (e) {
+    toast(e.message, 'error');
+    btn.disabled = false;
   }
 }
 
@@ -757,6 +1007,13 @@ function bind() {
   $('skip-list').addEventListener('click', (e) => { const b = e.target.closest('[data-act]'); if (b) setStatus(b.dataset.id, b.dataset.act); });
 
   $('btn-dash').addEventListener('click', loadDashboard);
+  $('m-kinds').addEventListener('click', (e) => { const b = e.target.closest('[data-kind]'); if (b) setMediaKind(b.dataset.kind); });
+  $('m-file').addEventListener('change', mediaPreview);
+  $('m-url').addEventListener('input', mediaPreview);
+  $('m-linktype').addEventListener('change', mediaPreview);
+  $('m-add').addEventListener('click', addMedia);
+  $('m-reload').addEventListener('click', loadMedia);
+  $('m-list').addEventListener('click', (e) => { const b = e.target.closest('[data-m]'); if (b) mediaAction(b); });
   $('switches').addEventListener('click', (e) => {
     const t = e.target.closest('[data-sw],[data-save]');
     if (!t) return;
