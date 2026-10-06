@@ -213,6 +213,14 @@
           <a id="sheet-link" target="_blank" rel="noopener" class="underline font-semibold">Google Sheet</a>
         </div>
 
+        <div class="space-y-3">
+          <div class="flex flex-wrap items-baseline gap-2">
+            <h3 class="font-bold text-lg">การเปิดรับคิว</h3>
+            <span class="text-sm text-slate-500">กดปุ่มเพื่อเปิด/ปิด มีผลทันที (สองช่องทางแยกกัน)</span>
+          </div>
+          <div id="switches" class="grid md:grid-cols-2 gap-3"></div>
+        </div>
+
         <div class="bg-white rounded-3xl shadow-sm p-5 space-y-4">
           <h3 class="font-bold">การรับจอง</h3>
           <div id="cfg-fields" class="grid md:grid-cols-2 gap-4"></div>
@@ -535,11 +543,7 @@ async function loadDashboard() {
 
 /* ------------------------------------------------------------------ ตั้งค่า */
 const CFG_UI = [
-  ['BOOKING_OPEN', 'เปิดรับจองคิวออนไลน์ (LINE)', 'bool'],
-  ['WALKIN_ENABLED', 'เปิดรับคิว walk-in (ตู้กดบัตรคิว)', 'bool'],
-  ['WALKIN_CLOSED_MESSAGE', 'ข้อความบนตู้เมื่อปิดรับ walk-in', 'text'],
   ['ANNOUNCEMENT', 'ข้อความประกาศบนหน้าจอง', 'textarea'],
-  ['CLOSED_MESSAGE', 'ข้อความเมื่อปิดรับจอง', 'text'],
   ['ORG_NAME', 'ชื่อหน่วยงาน', 'text'],
   ['SYSTEM_NAME', 'ชื่อระบบ', 'text'],
   ['BOOKING_DAYS_AHEAD', 'จองล่วงหน้าได้ (วันทำการ)', 'number'],
@@ -561,6 +565,8 @@ async function loadSettings() {
     const d = await api('adminSettings');
     $('sheet-link').href = d.sheetUrl;
     const cfg = {}; d.config.forEach((r) => { cfg[r.Key] = r.Value; });
+    state.cfg = cfg;
+    renderSwitches();
     $('cfg-fields').innerHTML = CFG_UI.map(([k, label, type]) => {
       const v = cfg[k] == null ? '' : cfg[k];
       const attrs = `data-table="Config" data-key="${k}" data-field="Value"`;
@@ -653,6 +659,50 @@ async function saveQuota(el) {
   }
 }
 
+/* สวิตช์เปิด/ปิดรับคิว: จองออนไลน์ (BOOKING_OPEN) · walk-in (WALKIN_ENABLED) แยกกัน */
+const SWITCHES = [
+  { key: 'BOOKING_OPEN', msgKey: 'CLOSED_MESSAGE', defMsg: 'ระบบปิดรับจองชั่วคราว', icon: '📱', name: 'จองคิวออนไลน์ (LINE)',
+    desc: 'สมาชิกจองคิวล่วงหน้าผ่าน LINE', offNote: 'สมาชิกจองใหม่ไม่ได้ · คิวที่จองไว้แล้วยังใช้ได้ตามปกติ' },
+  { key: 'WALKIN_ENABLED', msgKey: 'WALKIN_CLOSED_MESSAGE', defMsg: 'งดให้บริการตู้กดบัตรคิวชั่วคราว', icon: '🎫', name: 'Walk-in (ตู้กดบัตรคิว)',
+    desc: 'สมาชิกกดบัตรคิว ณ ที่ทำการ', offNote: 'ตู้กดบัตรคิวแสดงข้อความปิดรับ · บัตรที่ออกแล้วยังใช้ได้' },
+];
+
+function renderSwitches() {
+  const cfg = state.cfg || {};
+  $('switches').innerHTML = SWITCHES.map((w) => {
+    const on = !/^(false|no|0)$/i.test(String(cfg[w.key] == null ? 'TRUE' : cfg[w.key]).trim());
+    const msg = cfg[w.msgKey] || w.defMsg;
+    return `<div class="bg-white rounded-3xl shadow-sm p-4 border-l-8 ${on ? 'border-emerald-500' : 'border-rose-500'}">
+      <div class="flex items-center gap-3">
+        <span class="text-3xl">${w.icon}</span>
+        <div class="flex-1 min-w-0">
+          <div class="font-bold">${esc(w.name)}</div>
+          <div class="text-xs text-slate-500">${esc(w.desc)}</div>
+        </div>
+        <span class="text-sm font-bold rounded-full px-3 py-1 whitespace-nowrap ${on ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-700'}">● ${on ? 'เปิดรับ' : 'ปิดรับ'}</span>
+        <button data-sw="${w.key}" data-to="${on ? 'FALSE' : 'TRUE'}" class="text-sm font-bold rounded-xl px-4 py-2 text-white whitespace-nowrap ${on ? 'bg-rose-600 hover:bg-rose-700' : 'bg-emerald-600 hover:bg-emerald-700'}">${on ? 'ปิดรับ' : 'เปิดรับ'}</button>
+      </div>
+      ${on ? '' : `<div class="text-xs text-slate-500 mt-2">${esc(w.offNote)}</div>`}
+      <label class="block mt-3 text-xs text-slate-500">ข้อความที่แสดงเมื่อปิดรับ
+        <div class="flex gap-2 mt-1"><input data-msg="${w.msgKey}" maxlength="200" value="${esc(msg)}" class="flex-1 min-w-0 rounded-lg border border-slate-300 px-2 py-1.5 text-sm text-slate-800">
+        <button data-save="${w.msgKey}" class="text-sm rounded-lg px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold">บันทึก</button></div></label>
+    </div>`;
+  }).join('');
+}
+
+async function saveSwitch(key, value, btn) {
+  btn.disabled = true;
+  try {
+    const r = await api('adminSave', { table: 'Config', key, field: 'Value', value });
+    state.cfg[key] = r.value;
+    renderSwitches();
+    toast('บันทึกแล้ว');
+  } catch (e) {
+    toast(e.message, 'error');
+    btn.disabled = false;
+  }
+}
+
 async function saveField(el) {
   const value = el.type === 'checkbox' ? (el.checked ? 'TRUE' : 'FALSE') : el.value;
   el.disabled = true;
@@ -707,6 +757,17 @@ function bind() {
   $('skip-list').addEventListener('click', (e) => { const b = e.target.closest('[data-act]'); if (b) setStatus(b.dataset.id, b.dataset.act); });
 
   $('btn-dash').addEventListener('click', loadDashboard);
+  $('switches').addEventListener('click', (e) => {
+    const t = e.target.closest('[data-sw],[data-save]');
+    if (!t) return;
+    if (t.dataset.sw) {
+      const w = SWITCHES.find((x) => x.key === t.dataset.sw);
+      if (!confirm((t.dataset.to === 'TRUE' ? 'เปิดรับ' : 'ปิดรับ') + ' "' + w.name + '" ใช่หรือไม่?\nมีผลทันทีกับสมาชิกทุกคน')) return;
+      saveSwitch(w.key, t.dataset.to, t);
+    } else {
+      saveSwitch(t.dataset.save, document.querySelector(`[data-msg="${t.dataset.save}"]`).value.trim(), t);
+    }
+  });
   $('tab-settings').addEventListener('change', (e) => {
     if (!e.target.dataset) return;
     if (e.target.dataset.table) {
