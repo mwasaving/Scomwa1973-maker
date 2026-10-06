@@ -36,6 +36,8 @@
     .called .dn, .called .lbl, .called #serving, .called .grid span { color: #d1fae5; }
     @keyframes pulse { 50% { transform: scale(1.02); } }
     #callbox { font-size: 26px; font-weight: 800; margin-top: 10px; }
+    .skipped #state { background: #ffe4e6; color: #be123c; }
+    .skipped #callbox { font-size: 20px; color: #be123c; }
     .line { background: #fff; border-radius: 18px; padding: 16px; text-align: center; font-size: 15px; }
     .btn { display: inline-block; margin-top: 8px; border: 0; border-radius: 14px; padding: 12px 22px; font: inherit; font-weight: 700; font-size: 17px; background: #06c755; color: #fff; }
     .note { font-size: 13px; color: var(--muted); text-align: center; margin-top: 14px; line-height: 1.5; }
@@ -74,7 +76,7 @@ const APP = {
 };
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const STATE = { WAITING: 'รอเรียก', CALLED: 'ถึงคิวแล้ว', DONE: 'ใช้บริการเสร็จแล้ว', NO_SHOW: 'ไม่มาตามเรียก', CANCELLED: 'ยกเลิกแล้ว' };
+const STATE = { WAITING: 'รอเรียก', CALLED: 'ถึงคิวแล้ว', SKIPPED: 'เรียกผ่านแล้ว', DONE: 'ใช้บริการเสร็จแล้ว', NO_SHOW: 'ไม่มาตามเรียก', CANCELLED: 'ยกเลิกแล้ว' };
 
 // token มาจาก ?t= หรือจาก liff.state (กรณีเปิดผ่าน liff.line.me/<id>?t=...)
 function readToken() {
@@ -122,12 +124,14 @@ function render(d) {
   $('serving').innerHTML = d.nowServing.length
     ? 'กำลังให้บริการ: ' + d.nowServing.map((s) => `<b>${esc(s.queueNo)}</b> (ช่อง ${esc(s.counter)})`).join(', ')
     : (d.counterNos.length ? 'ให้บริการที่ช่อง ' + esc(d.counterNos.join(', ')) : '');
-  const called = d.status === 'CALLED';
+  const called = d.status === 'CALLED', skipped = d.status === 'SKIPPED';
   $('card').classList.toggle('called', called);
-  $('grid').hidden = called;
-  $('callbox').hidden = !called;
-  if (called) {
-    $('callbox').textContent = 'เชิญที่ช่องบริการ ' + d.counter;
+  $('card').classList.toggle('skipped', skipped);
+  $('grid').hidden = called || skipped;
+  $('callbox').hidden = !called && !skipped;
+  if (called || skipped) {
+    $('callbox').textContent = called ? 'เชิญที่ช่องบริการ ' + d.counter
+      : 'กรุณาติดต่อเจ้าหน้าที่' + (d.counter ? 'ที่ช่องบริการ ' + d.counter : '') + ' เพื่อเรียกคิวอีกครั้ง';
     if (d.calledAt && d.calledAt !== st.lastCall) { st.lastCall = d.calledAt; alertMe(); }
   }
   document.title = (called ? '🔔 ' : '') + d.queueNo + ' — บัตรคิวของฉัน';
