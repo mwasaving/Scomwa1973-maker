@@ -325,7 +325,29 @@ function showHero(c, flash) {
 }
 
 /* ------------------------------------------------------------------ สื่อประชาสัมพันธ์ (ชีต Media) */
-st.media = { list: [], key: '', i: -1, timer: null };
+st.media = { list: [], key: '', i: -1, timer: null, files: {} };
+
+// ไฟล์ที่อัปโหลดผ่านหน้า Admin (เก็บใน Drive แบบส่วนตัว) → โหลดผ่าน API ครั้งเดียวแล้วเก็บไว้ในหน่วยความจำ
+function loadFiles(list) {
+  list.filter((it) => it.fileId && !st.media.files[it.fileId]).forEach((it) => {
+    const rec = st.media.files[it.fileId] = { url: '' };
+    fetch(APP.API_URL + '?action=mediaFile&id=' + encodeURIComponent(it.fileId), { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((j) => {
+        if (!j || !j.ok) throw new Error('mediaFile');
+        const bin = atob(j.data.data), arr = new Uint8Array(bin.length);
+        for (let k = 0; k < bin.length; k++) arr[k] = bin.charCodeAt(k);
+        rec.url = URL.createObjectURL(new Blob([arr], { type: j.data.mime }));
+      })
+      .catch(() => { rec.url = it.src; rec.failed = true; })   // สำรอง: ลิงก์ Drive โดยตรง (ใช้ได้ถ้าแชร์ไฟล์ไว้)
+      .finally(() => { if (st.media.waiting) { st.media.waiting = false; nextMedia(); } });
+  });
+}
+
+function mediaSrc(it) {
+  if (!it.fileId) return it.src;
+  return (st.media.files[it.fileId] || {}).url || '';
+}
 
 function applyMedia(list) {
   list = OPT.media && Array.isArray(list) ? list : [];
@@ -340,6 +362,8 @@ function applyMedia(list) {
   $('m-stage').innerHTML = '';
   $('m-cap').hidden = true;
   st.media.i = -1;
+  st.media.waiting = false;
+  loadFiles(list);
   if (list.length) nextMedia();
   else if (OPT.media) showPlaceholder();
 }
@@ -359,21 +383,31 @@ function nextMedia() {
   const L = st.media.list;
   if (!L.length) return;
   clearTimeout(st.media.timer);
-  st.media.i = (st.media.i + 1) % L.length;
-  const it = L[st.media.i];
+  // ข้ามรายการที่ไฟล์ยังโหลดไม่เสร็จ · ถ้ายังไม่มีรายการไหนพร้อม → แสดงหน้าต้อนรับรอไว้
+  let it = null;
+  for (let n = 0; n < L.length; n++) {
+    const k = (st.media.i + 1 + n) % L.length;
+    if (L[k].kind === 'youtube' || mediaSrc(L[k])) { st.media.i = k; it = L[k]; break; }
+  }
   const stage = $('m-stage');
+  if (!it) {
+    st.media.waiting = true;
+    if (!stage.children.length) showPlaceholder();
+    return;
+  }
+  const src = mediaSrc(it);
   let el;
   if (it.kind === 'image') {
     el = document.createElement('img');
     el.alt = it.title || '';
     el.onerror = skipMedia;
-    el.src = it.src;
+    el.src = src;
   } else if (it.kind === 'video') {
     el = document.createElement('video');
     el.muted = true; el.autoplay = true; el.playsInline = true; el.loop = L.length === 1;
     el.onended = nextMedia;
     el.onerror = skipMedia;
-    el.src = it.src;
+    el.src = src;
   } else {
     const id = encodeURIComponent(it.src);
     el = document.createElement('iframe');
