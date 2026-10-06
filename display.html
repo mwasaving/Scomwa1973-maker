@@ -87,6 +87,16 @@
     .next { margin-top: auto; padding-top: .6vh; font-size: 1.9vh; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .next b { color: var(--ink); font-weight: 700; margin-left: .4vw; }
 
+    /* ---- คิวที่เรียกผ่าน (แสดงเมื่อมี) ---- */
+    #skip { display: flex; align-items: center; gap: 1.2vw; margin: 0 2vw 1.4vh; padding: 1vh 1.4vw; border-radius: 1.8vh;
+            background: #3b0d14; border: .25vh solid #9f1239; min-height: 0; }
+    #skip .t { flex: none; line-height: 1.15; }
+    #skip .t b { display: block; font-size: 2.5vh; color: #fecdd3; }
+    #skip .t span { font-size: 1.8vh; color: #fda4af; }
+    #skip-list { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: .8vh .6vw; max-height: 10.5vh; overflow: hidden; }
+    #skip-list span { background: #881337; border-radius: 1.2vh; padding: .3vh .9vw; font-size: 3vh; font-weight: 800; letter-spacing: .04em; white-space: nowrap; }
+    #skip-list span small { font-size: 1.7vh; font-weight: 600; color: #fecdd3; margin-left: .5vw; letter-spacing: 0; }
+
     footer { background: #04211c; border-top: .2vh solid var(--line); padding: .9vh 0; overflow: hidden; white-space: nowrap; font-size: 2.3vh; }
     #ticker { display: inline-block; padding-left: 100%; animation: ticker 28s linear infinite; }
     @keyframes ticker { to { transform: translateX(-100%); } }
@@ -189,6 +199,11 @@
     <section id="depts"></section>
   </main>
 
+  <section id="skip" hidden>
+    <div class="t"><b>⏭️ คิวที่เรียกผ่านแล้ว</b><span>กรุณาติดต่อเจ้าหน้าที่</span></div>
+    <div id="skip-list"></div>
+  </section>
+
   <footer><span id="ticker"></span></footer>
 
   <div id="start">
@@ -260,9 +275,21 @@ function apply(d) {
     showHero(d.calls[0], false);
   }
   st.seen = new Set(keys);
+  // คิวบนช่องใหญ่ถูก "เรียกผ่าน" → แสดงคิวที่เรียกล่าสุดแทน
+  if (st.hero && !st.queue.length && !st.speaking && (d.skipped || []).some((c) => c.deptId === st.hero.deptId && c.queueNo === st.hero.queueNo)) {
+    st.hero = d.calls[0] || null; renderHero();
+  }
   if (!d.calls.length) { st.hero = null; renderHero(); }
   renderRecent();
   renderDepts();
+  renderSkip();
+}
+
+function renderSkip() {
+  const L = st.data.skipped || [];
+  $('skip').hidden = !L.length;
+  $('skip-list').innerHTML = L.map((c) =>
+    `<span>${esc(c.queueNo)}${c.counter ? `<small>ช่อง ${esc(c.counter)}</small>` : ''}</span>`).join('');
 }
 
 function brand(d) {
