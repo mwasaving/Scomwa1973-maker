@@ -16,6 +16,7 @@
       &poll=4           ความถี่ดึงข้อมูล (วินาที, ขั้นต่ำ 3)
       &screen=LOBBY     ชื่อจอนี้ (ใช้กับคอลัมน์ Screens ในชีต Media เพื่อแสดงสื่อเฉพาะจอ)
       &media=0          ไม่แสดงสื่อประชาสัมพันธ์บนจอนี้
+      &mediasound=0     วิดีโอ/YouTube เล่นแบบปิดเสียง (ค่าเริ่มต้น = มีเสียง หลังแตะเริ่มจอ · ลดเสียงอัตโนมัติขณะประกาศเรียกคิว)
     สื่อประชาสัมพันธ์ (รูปภาพ / วิดีโอ / YouTube) จัดการในชีต Media — มีสื่อ = จอแบ่งเป็น สื่อ (ซ้าย) + คิว (ขวา)
   -->
   <style>
@@ -209,7 +210,7 @@
   <div id="start">
     <i>🔊</i>
     <b>แตะหน้าจอเพื่อเริ่มแสดงคิว</b>
-    <span>เปิดเสียงประกาศเรียกคิว และขยายเต็มจอ</span>
+    <span>เปิดเสียงประกาศเรียกคิว เสียงวิดีโอ และขยายเต็มจอ</span>
   </div>
   <div id="err" hidden></div>
 
@@ -225,6 +226,7 @@ const OPT = {
   poll: Math.max(3, parseInt(P.get('poll'), 10) || 4) * 1000,
   screen: (P.get('screen') || '').replace(/[^A-Za-z0-9_-]/g, ''),
   media: P.get('media') !== '0',
+  mediaSound: P.get('mediasound') !== '0',
 };
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -404,15 +406,18 @@ function nextMedia() {
     el.src = src;
   } else if (it.kind === 'video') {
     el = document.createElement('video');
-    el.muted = true; el.autoplay = true; el.playsInline = true; el.loop = L.length === 1;
+    el.muted = !mediaSoundOn(); el.autoplay = true; el.playsInline = true; el.loop = L.length === 1;
     el.onended = nextMedia;
     el.onerror = skipMedia;
     el.src = src;
+    // เบราว์เซอร์ไม่ยอมเล่นแบบมีเสียง (ยังไม่ได้แตะจอ) → เล่นแบบปิดเสียงแทน
+    el.play().catch(() => { el.muted = true; el.play().catch(() => {}); });
   } else {
     const id = encodeURIComponent(it.src);
     el = document.createElement('iframe');
     el.allow = 'autoplay; encrypted-media';
-    el.src = 'https://www.youtube-nocookie.com/embed/' + id + '?autoplay=1&mute=1&controls=0&loop=1&playlist=' + id + '&playsinline=1&rel=0&modestbranding=1';
+    el.src = 'https://www.youtube-nocookie.com/embed/' + id + '?autoplay=1&mute=' + (mediaSoundOn() ? 0 : 1) +
+      '&controls=0&loop=1&playlist=' + id + '&playsinline=1&rel=0&modestbranding=1&enablejsapi=1';
   }
   stage.appendChild(el);
   requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('on')));
@@ -424,6 +429,19 @@ function nextMedia() {
     const sec = it.seconds || (it.kind === 'video' ? 900 : 10);
     st.media.timer = setTimeout(nextMedia, sec * 1000);
   }
+}
+
+/* เสียงของวิดีโอ/YouTube: ต้องแตะเริ่มจอก่อน (นโยบายเบราว์เซอร์) · ปิดได้ด้วย ?mediasound=0 · ลดเสียงขณะประกาศเรียกคิว */
+const mediaSoundOn = () => st.started && OPT.sound && OPT.mediaSound && !st.speaking;
+
+function setMediaSound() {
+  const on = mediaSoundOn();
+  [...$('m-stage').children].forEach((x) => {
+    if (x.tagName === 'VIDEO') { x.muted = !on; if (on) x.play().catch(() => { x.muted = true; }); }
+    else if (x.tagName === 'IFRAME') {
+      try { x.contentWindow.postMessage(JSON.stringify({ event: 'command', func: on ? 'unMute' : 'mute', args: [] }), '*'); } catch (e) {}
+    }
+  });
 }
 
 function skipMedia() {
@@ -478,8 +496,9 @@ function announce(c) {
 
 async function nextAnnounce() {
   const c = st.queue.shift();
-  if (!c) { st.speaking = false; return; }
+  if (!c) { st.speaking = false; setMediaSound(); return; }
   st.speaking = true;
+  setMediaSound();   // ลดเสียงวิดีโอระหว่างประกาศ
   showHero(c, true);
   if (st.started && OPT.sound) {
     await chime();
@@ -529,6 +548,7 @@ function speak(text) {
     const done = () => { clearTimeout(guard); resolve(); };
     const guard = setTimeout(done, 9000);   // บางเครื่องไม่ส่ง onend
     u.onend = done; u.onerror = done;
+    try { speechSynthesis.cancel(); speechSynthesis.resume(); } catch (e) {}   // Chrome บางรุ่นค้างหลังพักนาน
     speechSynthesis.speak(u);
   });
 }
@@ -538,6 +558,8 @@ async function start() {
   if (st.started) return;
   st.started = true;
   $('start').hidden = true;
+  setMediaSound();   // เปิดเสียงวิดีโอที่กำลังเล่น (ต้องทำในจังหวะที่แตะจอ)
+  try { if (window.speechSynthesis && OPT.sound && OPT.voice) speechSynthesis.speak(new SpeechSynthesisUtterance(' ')); } catch (e) {}   // ปลดล็อกเสียงพูด
   try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); await audioCtx.resume(); } catch (e) {}
   try { if (document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen(); } catch (e) {}
   keepAwake();
