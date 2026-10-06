@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="robots" content="noindex" />
+  <title>เจ้าหน้าที่ — ระบบจองคิว</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    body { font-family: 'Sarabun', system-ui, sans-serif; }
+    [hidden] { display: none !important; }
+    .tab-on { background: #047857; color: #fff; }
+    /* ===== เอกสารรายงาน (หน้าจอ + พิมพ์/PDF) ===== */
+    .rpt { background: #fff; color: #1e293b; max-width: 1050px; margin: 0 auto; padding: 28px 32px; border-radius: 18px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+    .rpt h2 { font-size: 15px; font-weight: 700; color: #065f46; margin: 22px 0 8px; padding-bottom: 4px; border-bottom: 2px solid #d1fae5; }
+    .rpt table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .rpt th { background: #ecfdf5; color: #065f46; font-weight: 700; text-align: center; padding: 6px 8px; border: 1px solid #d1d5db; }
+    .rpt td { padding: 5px 8px; border: 1px solid #e5e7eb; text-align: right; }
+    .rpt td.l { text-align: left; }
+    .rpt td.c { text-align: center; }
+    .rpt tr.total td { font-weight: 700; background: #f8fafc; }
+    .rpt .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+    .rpt .kpi { border: 1px solid #e5e7eb; border-radius: 12px; padding: 10px 12px; }
+    .rpt .kpi b { display: block; font-size: 22px; color: #047857; }
+    .rpt .kpi span { font-size: 12px; color: #64748b; }
+    .rpt .bar { height: 10px; background: #e5e7eb; border-radius: 6px; overflow: hidden; min-width: 80px; }
+    .rpt .bar > i { display: block; height: 100%; background: #10b981; }
+    @media print {
+      @page { size: A4; margin: 12mm; }
+      body { background: #fff !important; }
+      body * { visibility: hidden; }
+      #report-doc, #report-doc * { visibility: visible; }
+      #report-doc { position: absolute; left: 0; top: 0; width: 100%; }
+      .rpt { box-shadow: none; padding: 0; max-width: none; border-radius: 0; }
+      .rpt h2, .rpt tr { break-inside: avoid; }
+      .rpt th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .rpt .bar > i, .rpt .kpi { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen">
+
+  <!-- ===== Login ===== -->
+  <section id="view-login" class="min-h-screen flex items-center justify-center p-4" hidden>
+    <form id="login-form" class="bg-white rounded-3xl shadow-lg p-8 w-full max-w-sm space-y-5">
+      <div class="text-center">
+        <img alt="โลโก้" class="brand-logo w-24 h-24 mx-auto object-contain" hidden />
+        <div class="brand-emoji text-4xl">🎫</div>
+        <h1 class="text-xl font-bold mt-2">สำหรับเจ้าหน้าที่</h1>
+        <p class="brand-sys text-sm text-slate-500">ระบบจองคิวออนไลน์</p>
+        <p class="brand-org text-xs text-slate-400"></p>
+      </div>
+      <label class="block">
+        <span class="text-sm text-slate-600">PIN</span>
+        <input id="pin" type="password" inputmode="numeric" autocomplete="current-password" maxlength="12"
+          class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 text-2xl tracking-[0.4em] text-center focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+      </label>
+      <p id="login-error" class="text-sm text-rose-600 text-center" hidden></p>
+      <button id="btn-login" type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold rounded-xl py-3">เข้าสู่ระบบ</button>
+      <p class="brand-credit text-center text-xs text-slate-400" hidden></p>
+    </form>
+  </section>
+
+  <!-- ===== App ===== -->
+  <div id="view-app" hidden>
+    <header class="bg-gradient-to-r from-emerald-700 to-teal-700 text-white">
+      <div class="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center gap-3">
+        <div class="font-bold text-lg mr-auto flex items-center gap-2">
+          <img alt="" class="brand-logo w-9 h-9 rounded-full bg-white p-0.5 object-contain" hidden />
+          <span>ระบบจองคิว — เจ้าหน้าที่</span>
+        </div>
+        <nav class="flex flex-wrap gap-1 bg-white/10 rounded-xl p-1 text-sm font-semibold">
+          <button data-tab="call" class="tab px-3 py-1.5 rounded-lg">📢 เรียกคิว</button>
+          <button data-tab="dash" class="tab admin-only px-3 py-1.5 rounded-lg">📊 ภาพรวม</button>
+          <button data-tab="report" class="tab admin-only px-3 py-1.5 rounded-lg">📈 รายงาน</button>
+          <button data-tab="settings" class="tab admin-only px-3 py-1.5 rounded-lg">⚙️ ตั้งค่า</button>
+          <a href="https://mwasaving.github.io/Scomwa1973-maker/exec.html" target="_blank" rel="noopener" class="admin-only px-3 py-1.5 rounded-lg hover:bg-white/15">🏛️ ผู้บริหาร</a>
+          <a href="https://mwasaving.github.io/Scomwa1973-maker/display.html" target="_blank" rel="noopener" class="px-3 py-1.5 rounded-lg hover:bg-white/15">📺 จอแสดงคิว</a>
+        </nav>
+        <div class="text-sm text-right leading-tight">
+          <div id="me-name" class="font-semibold"></div>
+          <div id="me-role" class="opacity-80 text-xs"></div>
+        </div>
+        <button id="btn-logout" class="text-sm bg-white/15 hover:bg-white/25 rounded-lg px-3 py-1.5">ออกจากระบบ</button>
+      </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto p-4">
+
+      <!-- ===== Tab: เรียกคิว ===== -->
+      <section id="tab-call" class="space-y-4" hidden>
+        <div class="flex flex-wrap items-end gap-3">
+          <label class="block">
+            <span class="text-xs text-slate-500">แผนก</span>
+            <select id="sel-dept" class="block mt-1 rounded-xl border border-slate-300 bg-white px-3 py-2 font-semibold min-w-[12rem]"></select>
+          </label>
+          <label class="block">
+            <span class="text-xs text-slate-500">ช่องบริการของฉัน</span>
+            <select id="sel-counter" class="block mt-1 rounded-xl border border-slate-300 bg-white px-3 py-2 font-semibold"></select>
+          </label>
+          <div class="ml-auto text-xs text-slate-500 flex items-center gap-2">
+            <span id="live-dot" class="w-2.5 h-2.5 rounded-full bg-slate-300"></span>
+            <span id="live-text">กำลังโหลด...</span>
+            <button id="btn-refresh" class="ml-1 underline">รีเฟรช</button>
+          </div>
+        </div>
+
+        <div class="grid lg:grid-cols-5 gap-4">
+          <!-- current at my counter -->
+          <div class="lg:col-span-3 bg-white rounded-3xl shadow-sm p-5 flex flex-col">
+            <div class="flex items-center justify-between">
+              <h2 class="font-bold text-slate-600">ช่อง <span id="cur-counter">1</span> — กำลังให้บริการ</h2>
+              <span id="cur-slot" class="text-sm text-slate-500"></span>
+            </div>
+            <div id="cur-empty" class="flex-1 flex items-center justify-center py-10 text-slate-400">ยังไม่มีคิวที่เรียกอยู่ที่ช่องนี้</div>
+            <div id="cur-box" class="flex-1 py-4 text-center" hidden>
+              <div id="cur-queue" class="text-7xl font-extrabold tracking-wider text-emerald-700"></div>
+              <div id="cur-name" class="text-xl font-semibold mt-2"></div>
+              <div id="cur-info" class="text-slate-500 mt-1"></div>
+            </div>
+            <button id="btn-next" class="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white text-2xl font-bold rounded-2xl py-5 shadow">📢 เรียกคิวถัดไป</button>
+            <div class="grid grid-cols-3 gap-2 mt-2">
+              <button id="btn-recall" class="bg-amber-100 hover:bg-amber-200 text-amber-900 font-semibold rounded-xl py-3 disabled:opacity-40">🔁 เรียกซ้ำ</button>
+              <button id="btn-done" class="bg-slate-100 hover:bg-slate-200 font-semibold rounded-xl py-3 disabled:opacity-40">✅ เสร็จสิ้น</button>
+              <button id="btn-noshow" class="bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold rounded-xl py-3 disabled:opacity-40">⏭️ เรียกผ่าน</button>
+            </div>
+            <p class="text-xs text-slate-400 mt-2">"เรียกคิวถัดไป" จะปิดคิวปัจจุบันของช่องนี้เป็น "เสร็จสิ้น" ให้อัตโนมัติ ·
+              "เรียกผ่าน" = เรียกแล้วไม่อยู่ — ขึ้นจอให้ติดต่อเจ้าหน้าที่ กลับมาแล้วกด "เรียกอีกครั้ง" ได้ (ปิดวันแล้วเป็น "ไม่มา")</p>
+          </div>
+
+          <!-- stats + next -->
+          <div class="lg:col-span-2 space-y-4">
+            <div class="grid grid-cols-3 gap-2 text-center" id="stats"></div>
+            <div class="bg-white rounded-3xl shadow-sm p-4">
+              <h3 class="font-bold text-slate-600 mb-2">คิวถัดไป</h3>
+              <ol id="next-list" class="space-y-1.5 text-sm"></ol>
+            </div>
+            <div id="skip-box" class="bg-rose-50 rounded-3xl p-4" hidden>
+              <h3 class="font-bold text-rose-800 mb-2">⏭️ คิวที่เรียกผ่าน <span class="font-normal text-xs">— สมาชิกกลับมาแล้ว กด "เรียกอีกครั้ง"</span></h3>
+              <ul id="skip-list" class="space-y-1.5 text-sm"></ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-3xl shadow-sm p-4">
+          <div class="flex flex-wrap items-center gap-2 mb-3">
+            <h3 class="font-bold text-slate-600 mr-auto">คิวทั้งหมดวันนี้</h3>
+            <div id="filters" class="flex gap-1 text-sm"></div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="text-left text-slate-500 border-b">
+                <tr><th class="py-2 pr-2">คิว</th><th class="pr-2">ช่วงเวลา</th><th class="pr-2">ชื่อ (LINE)</th><th class="pr-2">เลขสมาชิก</th><th class="pr-2">โทร</th><th class="pr-2">สถานะ</th><th class="pr-2">ช่อง</th><th class="text-right">จัดการ</th></tr>
+              </thead>
+              <tbody id="queue-rows"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== Tab: ภาพรวม ===== -->
+      <section id="tab-dash" class="space-y-4" hidden>
+        <div class="flex flex-wrap items-end gap-3">
+          <label class="block">
+            <span class="text-xs text-slate-500">วันที่</span>
+            <input id="dash-date" type="date" class="block mt-1 rounded-xl border border-slate-300 bg-white px-3 py-2" />
+          </label>
+          <button id="btn-dash" class="bg-emerald-600 text-white rounded-xl px-4 py-2 font-semibold">ดูข้อมูล</button>
+        </div>
+        <div id="dash-totals" class="grid grid-cols-3 md:grid-cols-6 gap-2 text-center"></div>
+        <div id="dash-depts" class="grid md:grid-cols-2 gap-4"></div>
+      </section>
+
+      <!-- ===== Tab: รายงาน ===== -->
+      <section id="tab-report" class="space-y-4" hidden>
+        <div class="bg-white rounded-3xl shadow-sm p-4 flex flex-wrap items-end gap-3">
+          <div class="flex gap-1 bg-slate-100 rounded-xl p-1 text-sm font-semibold">
+            <button type="button" data-rkind="service" class="rkind px-3 py-1.5 rounded-lg">📋 การให้บริการ</button>
+            <button type="button" data-rkind="survey" class="rkind px-3 py-1.5 rounded-lg">⭐ แบบประเมิน</button>
+          </div>
+          <label class="block">
+            <span class="text-xs text-slate-500">ประเภท</span>
+            <select id="r-period" class="block mt-1 rounded-xl border border-slate-300 bg-white px-3 py-2">
+              <option value="day">รายวัน</option><option value="month" selected>รายเดือน</option><option value="year">รายปี</option>
+            </select>
+          </label>
+          <label class="block" id="r-day-wrap"><span class="text-xs text-slate-500">วันที่</span>
+            <input id="r-day" type="date" class="block mt-1 rounded-xl border border-slate-300 px-3 py-2"></label>
+          <label class="block" id="r-month-wrap"><span class="text-xs text-slate-500">เดือน</span>
+            <input id="r-month" type="month" class="block mt-1 rounded-xl border border-slate-300 px-3 py-2"></label>
+          <label class="block" id="r-year-wrap"><span class="text-xs text-slate-500">ปี (พ.ศ.)</span>
+            <select id="r-year" class="block mt-1 rounded-xl border border-slate-300 bg-white px-3 py-2"></select></label>
+          <label class="block">
+            <span class="text-xs text-slate-500">แผนก</span>
+            <select id="r-dept" class="block mt-1 rounded-xl border border-slate-300 bg-white px-3 py-2 min-w-[11rem]"></select>
+          </label>
+          <button id="btn-report" type="button" class="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-4 py-2 font-semibold">ดูรายงาน</button>
+          <div class="ml-auto flex gap-2">
+            <button id="btn-xls" type="button" class="border border-emerald-600 text-emerald-700 rounded-xl px-4 py-2 font-semibold disabled:opacity-40" disabled>⬇️ Excel</button>
+            <button id="btn-pdf" type="button" class="border border-slate-400 text-slate-700 rounded-xl px-4 py-2 font-semibold disabled:opacity-40" disabled>🖨️ พิมพ์ / PDF</button>
+          </div>
+        </div>
+        <div id="report-doc"><p class="text-center text-slate-400 py-10">เลือกเงื่อนไขแล้วกด "ดูรายงาน"</p></div>
+      </section>
+
+      <!-- ===== Tab: ตั้งค่า ===== -->
+      <section id="tab-settings" class="space-y-4" hidden>
+        <div class="bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl p-3 text-sm">
+          แก้ค่าแล้วบันทึกทันที มีผลกับหน้าจองของสมาชิกภายในไม่กี่วินาที ·
+          เพิ่มแผนก/ช่วงเวลาใหม่, วันหยุด และ PIN เจ้าหน้าที่ ให้แก้ใน
+          <a id="sheet-link" target="_blank" rel="noopener" class="underline font-semibold">Google Sheet</a>
+        </div>
+
+        <div class="bg-white rounded-3xl shadow-sm p-5 space-y-4">
+          <h3 class="font-bold">การรับจอง</h3>
+          <div id="cfg-fields" class="grid md:grid-cols-2 gap-4"></div>
+        </div>
+
+        <div class="bg-white rounded-3xl shadow-sm p-5">
+          <h3 class="font-bold mb-3">แผนก / ฝ่าย</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="text-left text-slate-500 border-b"><tr><th class="py-2 pr-2">รหัส</th><th class="pr-2">ไอคอน</th><th class="pr-2">ชื่อแผนก</th><th class="pr-2">คำอธิบาย</th><th class="pr-2">จำนวนช่อง</th><th class="pr-2">หมายเลขช่อง</th><th class="pr-2">โควตา/ช่วง</th><th class="pr-2">โควตา/วัน</th><th class="pr-2">ลำดับ</th><th>เปิด</th></tr></thead>
+              <tbody id="dept-rows"></tbody>
+            </table>
+          </div>
+          <p class="text-xs text-slate-500 mt-2">หมายเลขช่อง = เลขช่องจริงของอาคาร คั่นด้วยจุลภาค เช่น 3,4,5 (สมาชิกจะเห็น "ให้บริการที่ช่อง 3, 4, 5" และ "เชิญที่ช่อง 4") · เว้นว่าง = ใช้ช่อง 1 ถึงจำนวนช่อง ·
+            โควตา/ช่วง = จำนวนคิวต่อช่วงเวลาของแผนกนั้น (เว้นว่าง = ใช้โควตาเริ่มต้นของช่วงเวลา) ·
+            โควตา/วัน = จำนวนคิวรวมทั้งวันของแผนก (เว้นว่างหรือ 0 = ไม่จำกัด)</p>
+        </div>
+
+        <div class="bg-white rounded-3xl shadow-sm p-5">
+          <h3 class="font-bold">โควตาแยกแผนก × ช่วงเวลา</h3>
+          <div class="flex flex-wrap items-center gap-2 my-3">
+            <span class="text-sm text-slate-600">ใช้กับ:</span>
+            <button type="button" id="quota-all" class="px-3 py-1.5 rounded-full text-sm font-semibold border">ทุกวัน</button>
+            <label class="flex items-center gap-1 text-sm text-slate-600">เฉพาะวันที่
+              <input type="date" id="quota-date" class="rounded-lg border border-slate-300 px-2 py-1">
+            </label>
+            <span id="quota-dates" class="flex flex-wrap gap-1"></span>
+          </div>
+          <p id="quota-hint" class="text-xs text-slate-500 mb-3"></p>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead id="quota-head" class="text-left text-slate-500 border-b"></thead>
+              <tbody id="quota-rows"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-3xl shadow-sm p-5">
+          <h3 class="font-bold mb-3">ช่วงเวลา และโควตา (คิวต่อแผนกต่อช่วง)</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="text-left text-slate-500 border-b"><tr><th class="py-2 pr-2">รหัส</th><th class="pr-2">ข้อความที่แสดง</th><th class="pr-2">เริ่ม</th><th class="pr-2">สิ้นสุด</th><th class="pr-2">โควตาเริ่มต้น</th><th class="pr-2">ลำดับ</th><th>เปิด</th></tr></thead>
+              <tbody id="slot-rows"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+    <footer class="text-center text-xs text-slate-400 pb-6">
+      <span class="brand-org"></span><br><span class="brand-credit" hidden></span>
+    </footer>
+  </div>
+
+  <div id="toast" class="fixed left-1/2 -translate-x-1/2 bottom-6 z-50 px-4 py-3 rounded-xl shadow-lg text-white text-sm font-semibold" hidden></div>
+
+<script>
+const APP = {
+  API_URL: 'https://script.google.com/macros/s/AKfycbxsWhekn5r2CQQ552TU6foeP6ENDifmzCUt63Kl3GOO253Dq2aL0pIroqJVs9s85-Exzw/exec',
+};
+
+const STATUS_UI = {
+  WAITING:   { label: 'รอเรียก',     cls: 'bg-amber-100 text-amber-800' },
+  CALLED:    { label: 'กำลังเรียก',   cls: 'bg-emerald-600 text-white' },
+  SKIPPED:   { label: 'เรียกผ่าน',    cls: 'bg-orange-100 text-orange-800' },
+  DONE:      { label: 'เสร็จสิ้น',    cls: 'bg-slate-200 text-slate-700' },
+  NO_SHOW:   { label: 'ไม่มา',       cls: 'bg-rose-100 text-rose-700' },
+  CANCELLED: { label: 'ยกเลิก',      cls: 'bg-slate-100 text-slate-400' },
+};
+
+const state = { session: null, staff: null, tab: 'call', dept: null, counter: '1', queue: null, filter: 'ACTIVE', busy: false };
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+  del(k) { try { localStorage.removeItem(k); } catch (e) {} },
+};
+
+let toastTimer;
+function toast(msg, type) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.className = el.className.replace(/bg-\S+/g, '') + ' ' + (type === 'error' ? 'bg-rose-600' : 'bg-emerald-700');
+  el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.hidden = true; }, 3000);
+}
+
+/* ------------------------------------------------------------------ API */
+async function api(action, data) {
+  const payload = Object.assign({ action, session: state.session }, data || {});
+  let res;
+  try {
+    const r = await fetch(APP.API_URL, { method: 'POST', body: JSON.stringify(payload), redirect: 'follow' });
+    res = await r.json();
+  } catch (e) {
+    const err = new Error('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้'); err.code = 'NETWORK'; throw err;
+  }
+  if (!res || !res.ok) {
+    const err = new Error((res && res.message) || 'เกิดข้อผิดพลาด'); err.code = res && res.code;
+    if (err.code === 'AUTH_EXPIRED') logout(err.message);
+    throw err;
+  }
+  return res.data;
+}
+
+/* ------------------------------------------------------------------ login */
+async function login(pin) {
+  const d = await api('staffLogin', { pin });
+  state.session = d.session;
+  store.set('q_staff_session', JSON.stringify({ session: d.session, exp: Date.now() + 11.5 * 3600000 }));
+  startApp(d.staff);
+}
+
+function logout(msg) {
+  state.session = null; state.staff = null;
+  store.del('q_staff_session');
+  stopPolling();
+  $('view-app').hidden = true;
+  $('view-login').hidden = false;
+  $('pin').value = '';
+  $('login-error').hidden = !msg;
+  $('login-error').textContent = msg || '';
+  $('pin').focus();
+}
+
+function startApp(staff) {
+  if (staff.role === 'EXEC') { location.replace('https://mwasaving.github.io/Scomwa1973-maker/exec.html'); return; }   // ผู้บริหารใช้หน้า Dashboard
+  state.staff = staff;
+  $('view-login').hidden = true;
+  $('view-app').hidden = false;
+  $('me-name').textContent = staff.name;
+  $('me-role').textContent = staff.role === 'ADMIN' ? 'ผู้ดูแลระบบ' : 'เจ้าหน้าที่';
+  document.querySelectorAll('.admin-only').forEach((el) => { el.hidden = staff.role !== 'ADMIN'; });
+
+  $('sel-dept').innerHTML = staff.depts.map((d) => `<option value="${esc(d.id)}">${esc(d.icon)} ${esc(d.name)}</option>`).join('');
+  const savedDept = store.get('q_staff_dept');
+  state.dept = staff.depts.find((d) => d.id === savedDept) || staff.depts[0] || null;
+  if (state.dept) $('sel-dept').value = state.dept.id;
+  fillCounters();
+  initReportControls();
+  showTab('call');
+}
+
+function counterList(dept) {
+  if (dept && dept.counterNos && dept.counterNos.length) return dept.counterNos.map(String);
+  const n = dept ? dept.counters || 1 : 1;
+  return Array.from({ length: n }, (_, i) => String(i + 1));
+}
+
+function fillCounters() {
+  const list = counterList(state.dept);
+  $('sel-counter').innerHTML = list.map((c) => `<option value="${esc(c)}">ช่อง ${esc(c)}</option>`).join('');
+  const saved = store.get('q_staff_counter_' + (state.dept && state.dept.id));
+  state.counter = saved && list.includes(saved) ? saved : list[0];
+  $('sel-counter').value = state.counter;
+  $('cur-counter').textContent = state.counter;
+}
+
+function showTab(tab) {
+  state.tab = tab;
+  document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('tab-on', b.dataset.tab === tab));
+  ['call', 'dash', 'report', 'settings'].forEach((t) => { $('tab-' + t).hidden = t !== tab; });
+  if (tab === 'call') startPolling(); else stopPolling();
+  if (tab === 'dash') loadDashboard();
+  if (tab === 'settings') loadSettings();
+}
+
+/* ------------------------------------------------------------------ เรียกคิว */
+const poll = { timer: null, gen: 0 };
+function startPolling() { stopPolling(); const g = ++poll.gen; tick(g); }
+function stopPolling() { poll.gen++; clearTimeout(poll.timer); }
+async function tick(g) {
+  if (g !== poll.gen) return;
+  if (!document.hidden) await loadQueue();
+  if (g !== poll.gen) return;
+  poll.timer = setTimeout(() => tick(g), 8000);
+}
+
+async function loadQueue() {
+  if (!state.dept) { $('live-text').textContent = 'คุณยังไม่ได้รับสิทธิ์ดูแลแผนกใด'; return; }
+  try {
+    state.queue = await api('staffQueue', { deptId: state.dept.id });
+    const qd = state.queue.dept;
+    if (counterList(qd).join(',') !== counterList(state.dept).join(',')) {   // แอดมินเปลี่ยนเลขช่อง → อัปเดตตัวเลือก
+      state.dept.counters = qd.counters; state.dept.counterNos = qd.counterNos; fillCounters();
+    }
+    renderQueue();
+    $('live-dot').className = 'w-2.5 h-2.5 rounded-full bg-emerald-500';
+    $('live-text').textContent = 'อัปเดต ' + state.queue.serverTime.slice(11, 19);
+  } catch (e) {
+    $('live-dot').className = 'w-2.5 h-2.5 rounded-full bg-rose-500';
+    $('live-text').textContent = e.message;
+  }
+}
+
+function currentAtMyCounter() {
+  if (!state.queue) return null;
+  return state.queue.bookings
+    .filter((b) => b.status === 'CALLED' && String(b.counter) === String(state.counter))
+    .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))[0] || null;
+}
+
+function renderQueue() {
+  const q = state.queue;
+  if (!q) return;
+  const cur = currentAtMyCounter();
+  $('cur-empty').hidden = !!cur;
+  $('cur-box').hidden = !cur;
+  $('cur-slot').textContent = cur ? cur.slotLabel : '';
+  if (cur) {
+    $('cur-queue').textContent = cur.queueNo;
+    $('cur-name').textContent = cur.displayName || '-';
+    $('cur-info').textContent = 'สมาชิก ' + (cur.memberId || '-') + ' · โทร ' + (cur.phone || '-');
+  }
+  ['btn-recall', 'btn-done', 'btn-noshow'].forEach((id) => { $(id).disabled = !cur || state.busy; });
+  $('btn-next').disabled = state.busy;
+
+  const s = q.summary;
+  const stat = (label, n, cls) => `<div class="rounded-2xl p-3 ${cls}"><div class="text-2xl font-extrabold">${n}</div><div class="text-xs">${label}</div></div>`;
+  $('stats').innerHTML = stat('รอเรียก', s.waiting, 'bg-amber-50 text-amber-900') + stat('กำลังเรียก', s.called, 'bg-emerald-50 text-emerald-800') +
+    stat('เรียกผ่าน', s.skipped || 0, 'bg-orange-50 text-orange-800') + stat('เสร็จสิ้น', s.done, 'bg-slate-50') +
+    stat('ไม่มา', s.noShow, 'bg-rose-50 text-rose-800') + stat('จองทั้งหมด', s.total, 'bg-white border');
+
+  const skipped = q.bookings.filter((b) => b.status === 'SKIPPED').sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
+  $('skip-box').hidden = !skipped.length;
+  $('skip-list').innerHTML = skipped.map((b) => `<li class="flex items-center justify-between gap-2">
+    <span><b>${esc(b.queueNo)}</b> · ${esc(b.displayName || '')}${b.counter ? ` <span class="text-xs text-slate-500">(ช่อง ${esc(b.counter)})</span>` : ''}</span>
+    <button data-act="CALLED" data-id="${esc(b.bookingId)}" class="shrink-0 px-2 py-1 rounded-lg text-xs font-semibold bg-emerald-600 text-white">📢 เรียกอีกครั้ง</button></li>`).join('');
+
+  const waiting = q.bookings.filter((b) => b.status === 'WAITING');
+  $('next-list').innerHTML = waiting.length
+    ? waiting.slice(0, 6).map((b, i) => `<li class="flex justify-between gap-2 ${i === 0 ? 'font-bold text-emerald-700' : ''}"><span>${esc(b.queueNo)} · ${esc(b.displayName || '')}</span><span class="text-slate-400 text-xs">${esc(b.slotLabel)}</span></li>`).join('')
+    : '<li class="text-slate-400">ไม่มีคิวรอ</li>';
+
+  const filters = [['ACTIVE', 'รอ/กำลังเรียก'], ['SKIPPED', 'เรียกผ่าน'], ['ALL', 'ทั้งหมด'], ['DONE', 'เสร็จ/ไม่มา']];
+  $('filters').innerHTML = filters.map(([k, l]) => `<button data-filter="${k}" class="px-3 py-1 rounded-lg ${state.filter === k ? 'bg-emerald-600 text-white' : 'bg-slate-100'}">${l}</button>`).join('');
+
+  const rows = q.bookings.filter((b) => state.filter === 'ALL' ? true
+    : state.filter === 'ACTIVE' ? (b.status === 'WAITING' || b.status === 'CALLED' || b.status === 'SKIPPED')
+    : state.filter === 'SKIPPED' ? b.status === 'SKIPPED'
+    : (b.status === 'DONE' || b.status === 'NO_SHOW'));
+  $('queue-rows').innerHTML = rows.length ? rows.map(rowHtml).join('')
+    : '<tr><td colspan="8" class="py-6 text-center text-slate-400">ไม่มีรายการ</td></tr>';
+}
+
+function rowHtml(b) {
+  const ui = STATUS_UI[b.status] || { label: b.status, cls: 'bg-slate-100' };
+  const act = (st, label, cls) => `<button data-act="${st}" data-id="${esc(b.bookingId)}" class="px-2 py-1 rounded-lg text-xs font-semibold ${cls}">${label}</button>`;
+  let actions = '';
+  if (b.status === 'WAITING') actions = act('CALLED', '📢 เรียกที่ช่อง ' + esc(state.counter), 'bg-emerald-600 text-white') + ' ' + act('NO_SHOW', 'ไม่มา', 'bg-rose-50 text-rose-700');
+  else if (b.status === 'CALLED') actions = act('CALLED', 'เรียกซ้ำ', 'bg-amber-100') + ' ' + act('DONE', 'เสร็จ', 'bg-slate-100') + ' ' + act('SKIPPED', 'ผ่าน', 'bg-orange-100 text-orange-800');
+  else if (b.status === 'SKIPPED') actions = act('CALLED', '📢 เรียกอีกครั้งที่ช่อง ' + esc(state.counter), 'bg-emerald-600 text-white') + ' ' + act('NO_SHOW', 'ไม่มา', 'bg-rose-50 text-rose-700');
+  else if (b.status === 'DONE' || b.status === 'NO_SHOW') actions = act('WAITING', 'คืนกลับไปรอ', 'bg-slate-100');
+  return `<tr class="border-b last:border-0 ${b.status === 'CALLED' ? 'bg-emerald-50' : ''}">
+    <td class="py-2 pr-2 font-bold">${esc(b.queueNo)}</td><td class="pr-2">${esc(b.slotLabel)}</td>
+    <td class="pr-2">${esc(b.displayName)}</td><td class="pr-2">${esc(b.memberId)}</td><td class="pr-2">${esc(b.phone)}</td>
+    <td class="pr-2"><span class="px-2 py-0.5 rounded-full text-xs font-semibold ${ui.cls}">${ui.label}</span></td>
+    <td class="pr-2">${esc(b.counter)}</td><td class="text-right whitespace-nowrap">${actions}</td></tr>`;
+}
+
+async function runAction(fn, okMsg) {
+  if (state.busy) return;
+  state.busy = true; renderQueue();
+  try {
+    const r = await fn();
+    if (okMsg) toast(typeof okMsg === 'function' ? okMsg(r) : okMsg);
+  } catch (e) {
+    toast(e.message, 'error');
+  } finally {
+    state.busy = false;
+    await loadQueue();
+  }
+}
+
+function callNext() {
+  return runAction(() => api('staffCallNext', { deptId: state.dept.id, counter: state.counter }),
+    (r) => r.called ? 'เรียกคิว ' + r.called.queueNo + ' ที่ช่อง ' + state.counter : 'ไม่มีคิวรอแล้ว');
+}
+function setStatus(bookingId, status) {
+  const msg = { CALLED: 'เรียกคิวแล้ว', DONE: 'บันทึกเสร็จสิ้น', NO_SHOW: 'บันทึกไม่มา', WAITING: 'คืนคิวกลับไปรอแล้ว',
+                SKIPPED: 'เรียกผ่านแล้ว — ขึ้นจอให้ติดต่อเจ้าหน้าที่' }[status];
+  return runAction(() => api('staffSetStatus', { bookingId, status, counter: state.counter }), msg);
+}
+
+/* ------------------------------------------------------------------ ภาพรวม */
+async function loadDashboard() {
+  const date = $('dash-date').value;
+  $('dash-depts').innerHTML = '<p class="text-slate-400">กำลังโหลด...</p>';
+  try {
+    const d = await api('adminDashboard', { date });
+    $('dash-date').value = d.date;
+    const t = d.totals;
+    const card = (label, n, cls) => `<div class="rounded-2xl p-3 ${cls}"><div class="text-2xl font-extrabold">${n}</div><div class="text-xs">${label}</div></div>`;
+    $('dash-totals').innerHTML = card('จองทั้งหมด', t.total, 'bg-white border') + card('รอเรียก', t.WAITING, 'bg-amber-50 text-amber-900') +
+      card('กำลังเรียก', t.CALLED, 'bg-emerald-50 text-emerald-800') + card('เรียกผ่าน', t.SKIPPED || 0, 'bg-orange-50 text-orange-800') +
+      card('เสร็จสิ้น', t.DONE, 'bg-slate-50') +
+      card('ไม่มา', t.NO_SHOW, 'bg-rose-50 text-rose-800') + card('ยกเลิก', t.CANCELLED, 'bg-slate-50 text-slate-500') +
+      (!d.push ? '' : d.push.error
+        ? `<div class="col-span-full rounded-2xl p-3 bg-rose-50 text-rose-800 text-sm">LINE แจ้งเตือน: ใช้งานไม่ได้ (${esc(d.push.error)}) — ตรวจ LINE_MESSAGING_TOKEN</div>`
+        : `<div class="col-span-full rounded-2xl p-3 text-sm ${d.push.limit != null && d.push.used >= d.push.limit ? 'bg-rose-50 text-rose-800' : 'bg-emerald-50 text-emerald-900'}">
+            💬 ข้อความ LINE เดือนนี้: <b>${d.push.used}</b>${d.push.limit != null ? ' / ' + d.push.limit + (d.push.used >= d.push.limit ? ' — โควตาเต็ม สมาชิกจะได้รับเฉพาะเสียงจากหน้าเว็บ' : '') : ' (ไม่จำกัด)'}</div>`);
+    $('dash-depts').innerHTML = d.depts.map((x) => `
+      <div class="bg-white rounded-3xl shadow-sm p-4">
+        <div class="flex justify-between items-center mb-2">
+          <h4 class="font-bold">${esc(x.icon)} ${esc(x.name)}</h4>
+          <span class="text-xs text-slate-500">${x.counters} ช่อง · จอง ${x.total}${x.dailyQuota ? '/' + x.dailyQuota + (x.total >= x.dailyQuota ? ' <b class="text-rose-600">(เต็ม)</b>' : '') : ''} · รอ ${x.WAITING} · เสร็จ ${x.DONE} · ไม่มา ${x.NO_SHOW}</span>
+        </div>
+        ${x.slots.map((s) => {
+          const pct = s.quota ? Math.min(100, Math.round(100 * s.booked / s.quota)) : 0;
+          return `<div class="flex items-center gap-2 text-xs my-1"><span class="w-28 shrink-0 text-slate-500">${esc(s.label)}</span>
+            <div class="flex-1 h-2.5 bg-slate-100 rounded-full overflow-hidden"><div class="h-full ${pct >= 100 ? 'bg-rose-500' : 'bg-emerald-500'}" style="width:${pct}%"></div></div>
+            <span class="w-14 text-right">${s.booked}/${s.quota}</span></div>`;
+        }).join('')}
+      </div>`).join('');
+  } catch (e) {
+    $('dash-depts').innerHTML = `<p class="text-rose-600">${esc(e.message)}</p>`;
+  }
+}
+
+/* ------------------------------------------------------------------ ตั้งค่า */
+const CFG_UI = [
+  ['BOOKING_OPEN', 'เปิดรับจองคิวออนไลน์ (LINE)', 'bool'],
+  ['WALKIN_ENABLED', 'เปิดรับคิว walk-in (ตู้กดบัตรคิว)', 'bool'],
+  ['WALKIN_CLOSED_MESSAGE', 'ข้อความบนตู้เมื่อปิดรับ walk-in', 'text'],
+  ['ANNOUNCEMENT', 'ข้อความประกาศบนหน้าจอง', 'textarea'],
+  ['CLOSED_MESSAGE', 'ข้อความเมื่อปิดรับจอง', 'text'],
+  ['ORG_NAME', 'ชื่อหน่วยงาน', 'text'],
+  ['SYSTEM_NAME', 'ชื่อระบบ', 'text'],
+  ['BOOKING_DAYS_AHEAD', 'จองล่วงหน้าได้ (วันทำการ)', 'number'],
+  ['MAX_BOOKINGS_PER_USER_PER_DAY', 'คิวสูงสุดต่อคนต่อวัน', 'number'],
+  ['OPEN_WEEKDAYS', 'วันเปิดบริการ (1=จ. … 7=อา.)', 'text'],
+  ['ALLOW_SAME_DAY', 'จองคิวของวันนี้ได้', 'bool'],
+  ['PUSH_ENABLED', 'ส่งข้อความ LINE เมื่อถึงคิว (ดังแม้ปิดจอ)', 'bool'],
+  ['PUSH_AHEAD', 'ส่ง LINE "ใกล้ถึงคิว" เมื่อเหลือก่อนหน้า ≤ N คิว (0 = ไม่ส่ง)', 'number'],
+  ['LINE_OA_ID', 'LINE ID ของ Official Account (เช่น @123abcde)', 'text'],
+  ['LIFF_URL', 'ลิงก์หน้าจองคิว (แนบท้ายข้อความ LINE)', 'text'],
+  ['SURVEY_ENABLED', 'เปิดแบบประเมินความพึงพอใจหลังรับบริการ', 'bool'],
+  ['SURVEY_PUSH', 'ส่ง LINE ชวนทำแบบประเมินเมื่อบริการเสร็จ', 'bool'],
+  ['LOGO_URL', 'ลิงก์รูปโลโก้ (https)', 'text'],
+  ['DEVELOPED_BY', 'พัฒนาโดย (แสดงท้ายหน้าจอและรายงาน)', 'text'],
+];
+
+async function loadSettings() {
+  try {
+    const d = await api('adminSettings');
+    $('sheet-link').href = d.sheetUrl;
+    const cfg = {}; d.config.forEach((r) => { cfg[r.Key] = r.Value; });
+    $('cfg-fields').innerHTML = CFG_UI.map(([k, label, type]) => {
+      const v = cfg[k] == null ? '' : cfg[k];
+      const attrs = `data-table="Config" data-key="${k}" data-field="Value"`;
+      if (type === 'bool') {
+        const on = /^(true|yes|1)$/i.test(v);
+        return `<label class="flex items-center justify-between gap-3 bg-slate-50 rounded-xl px-4 py-3"><span class="font-semibold">${label}</span>
+          <input type="checkbox" class="w-6 h-6 accent-emerald-600" ${attrs} ${on ? 'checked' : ''}></label>`;
+      }
+      const input = type === 'textarea'
+        ? `<textarea rows="2" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" ${attrs}>${esc(v)}</textarea>`
+        : `<input type="${type === 'number' ? 'number' : 'text'}" min="0" value="${esc(v)}" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" ${attrs}>`;
+      return `<label class="block ${type === 'textarea' ? 'md:col-span-2' : ''}"><span class="text-sm text-slate-600">${label}</span>${input}</label>`;
+    }).join('');
+
+    const inp = (table, key, field, value, cls, type) => `<input type="${type || 'text'}" min="0" value="${esc(value)}" data-table="${table}" data-key="${esc(key)}" data-field="${field}" class="w-full rounded-lg border border-slate-300 px-2 py-1 ${cls || ''}">`;
+    const chk = (table, key, value) => `<input type="checkbox" class="w-5 h-5 accent-emerald-600" data-table="${table}" data-key="${esc(key)}" data-field="Active" ${/^true$/i.test(value) ? 'checked' : ''}>`;
+    $('dept-rows').innerHTML = d.departments.map((r) => `<tr class="border-b last:border-0">
+      <td class="py-2 pr-2 font-mono text-xs">${esc(r.DeptID)}</td>
+      <td class="pr-2 w-16">${inp('Departments', r.DeptID, 'Icon', r.Icon, 'text-center')}</td>
+      <td class="pr-2 min-w-[10rem]">${inp('Departments', r.DeptID, 'DeptName', r.DeptName)}</td>
+      <td class="pr-2 min-w-[12rem]">${inp('Departments', r.DeptID, 'Description', r.Description)}</td>
+      <td class="pr-2 w-20">${inp('Departments', r.DeptID, 'Counters', r.Counters || 1, 'text-center', 'number')}</td>
+      <td class="pr-2 w-28">${inp('Departments', r.DeptID, 'CounterNos', r.CounterNos, 'text-center').replace('<input', '<input placeholder="เช่น 3,4,5"')}</td>
+      <td class="pr-2 w-24">${inp('Departments', r.DeptID, 'SlotQuota', r.SlotQuota, 'text-center', 'number').replace('<input', '<input placeholder="ตามช่วง"')}</td>
+      <td class="pr-2 w-24">${inp('Departments', r.DeptID, 'DailyQuota', r.DailyQuota, 'text-center', 'number').replace('<input', '<input placeholder="ไม่จำกัด"')}</td>
+      <td class="pr-2 w-20">${inp('Departments', r.DeptID, 'SortOrder', r.SortOrder, 'text-center', 'number')}</td>
+      <td>${chk('Departments', r.DeptID, r.Active)}</td></tr>`).join('');
+    $('slot-rows').innerHTML = d.slots.map((r) => `<tr class="border-b last:border-0">
+      <td class="py-2 pr-2 font-mono text-xs">${esc(r.SlotID)}</td>
+      <td class="pr-2 min-w-[10rem]">${inp('TimeSlots', r.SlotID, 'Label', r.Label)}</td>
+      <td class="pr-2 w-24">${inp('TimeSlots', r.SlotID, 'StartTime', r.StartTime, 'text-center')}</td>
+      <td class="pr-2 w-24">${inp('TimeSlots', r.SlotID, 'EndTime', r.EndTime, 'text-center')}</td>
+      <td class="pr-2 w-20">${inp('TimeSlots', r.SlotID, 'DefaultQuota', r.DefaultQuota, 'text-center', 'number')}</td>
+      <td class="pr-2 w-20">${inp('TimeSlots', r.SlotID, 'SortOrder', r.SortOrder, 'text-center', 'number')}</td>
+      <td>${chk('TimeSlots', r.SlotID, r.Active)}</td></tr>`).join('');
+    state.settings = d;
+    renderQuotaGrid();
+  } catch (e) {
+    toast(e.message, 'error');
+  }
+}
+
+/** ตารางโควตา แผนก × ช่วงเวลา — ช่องว่างแสดงค่าที่ใช้อยู่จริงเป็นตัวเลขสีเทา (placeholder) */
+function renderQuotaGrid() {
+  const d = state.settings;
+  if (!d) return;
+  const isBlank = (v) => v == null || String(v).trim() === '';
+  const qd = state.quotaDate || '';
+  const all = {}, ov = {};
+  (d.quotas || []).forEach((q) => {
+    if (!q.date) all[q.deptId + '|' + q.slotId] = q.max;
+    if ((q.date || '') === qd) ov[q.deptId + '|' + q.slotId] = q.max;
+  });
+  // ปุ่มเลือก "ทุกวัน" / วันที่ + ป้ายวันที่ที่มีโควตาพิเศษ (เฉพาะวันนี้เป็นต้นไป)
+  $('quota-all').className = 'px-3 py-1.5 rounded-full text-sm font-semibold border ' + (qd ? 'bg-white text-slate-600' : 'bg-emerald-600 text-white border-emerald-600');
+  $('quota-date').value = qd;
+  $('quota-date').min = d.today || '';
+  const dates = [...new Set((d.quotas || []).map((q) => q.date).filter((x) => x && x >= (d.today || '')))].sort();
+  $('quota-dates').innerHTML = dates.map((x) => `<button type="button" data-qdate="${x}" class="px-2 py-1 rounded-full text-xs border ${x === qd ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-amber-50 border-amber-300 text-amber-900'}">📅 ${new Date(x + 'T00:00:00').toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}</button>`).join('');
+  $('quota-hint').innerHTML = qd
+    ? `กำลังแก้โควตา <b>เฉพาะวันที่ ${new Date(qd + 'T00:00:00').toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</b> · ใส่ตัวเลขเฉพาะช่องที่ต่างจากปกติ (0 = ปิดรับช่วงนั้น) · เว้นว่าง = ใช้โควตาปกติ (ตัวเลขสีเทา)`
+    : 'โควตาที่ใช้ <b>ทุกวัน</b> · ใส่ตัวเลขเฉพาะช่องที่ต้องการกำหนดพิเศษ (0 = ปิดรับช่วงนั้น) · เว้นว่าง = ใช้โควตา/ช่วงของแผนก หรือโควตาเริ่มต้นของช่วงเวลา (ตัวเลขสีเทา) · ต้องการกำหนดเฉพาะบางวัน ให้เลือก "เฉพาะวันที่"';
+  $('quota-head').innerHTML = '<tr><th class="py-2 pr-2">แผนก</th>' +
+    d.slots.map((s) => `<th class="pr-2 text-center whitespace-nowrap">${esc(s.Label || s.SlotID)}</th>`).join('') + '</tr>';
+  $('quota-rows').innerHTML = d.departments.map((r) => '<tr class="border-b last:border-0">' +
+    `<td class="py-2 pr-2 whitespace-nowrap">${esc(r.Icon || '')} ${esc(r.DeptName)}</td>` +
+    d.slots.map((s) => {
+      const k = r.DeptID + '|' + s.SlotID;
+      let base = isBlank(r.SlotQuota) ? s.DefaultQuota : r.SlotQuota;
+      if (qd && Object.prototype.hasOwnProperty.call(all, k)) base = all[k];   // ค่าปกติของวันนั้น = โควตาทุกวัน
+      const has = Object.prototype.hasOwnProperty.call(ov, k);
+      return `<td class="pr-2"><input type="number" min="0" data-quota-dept="${esc(r.DeptID)}" data-quota-slot="${esc(s.SlotID)}"
+        value="${has ? esc(ov[k]) : ''}" placeholder="${esc(base)}"
+        class="w-20 rounded-lg border px-2 py-1 text-center ${has ? 'border-emerald-500 bg-emerald-50 font-bold' : 'border-slate-300'}"></td>`;
+    }).join('') + '</tr>').join('');
+}
+
+async function saveQuota(el) {
+  el.disabled = true;
+  try {
+    const r = await api('adminSetQuota', { deptId: el.dataset.quotaDept, slotId: el.dataset.quotaSlot, date: state.quotaDate || '', value: el.value.trim() });
+    const q = (state.settings.quotas || []).filter((x) => !(x.deptId === r.deptId && x.slotId === r.slotId && (x.date || '') === (r.date || '')));
+    if (r.value !== '') q.push({ deptId: r.deptId, slotId: r.slotId, date: r.date || '', max: Number(r.value) });
+    state.settings.quotas = q;
+    renderQuotaGrid();
+    toast(r.value === '' ? 'ล้างโควตาเฉพาะแล้ว (ใช้ค่าเริ่มต้น)' : 'บันทึกโควตาแล้ว');
+  } catch (e) {
+    toast(e.message, 'error');
+    el.disabled = false;
+  }
+}
+
+async function saveField(el) {
+  const value = el.type === 'checkbox' ? (el.checked ? 'TRUE' : 'FALSE') : el.value;
+  el.disabled = true;
+  try {
+    const r = await api('adminSave', { table: el.dataset.table, key: el.dataset.key, field: el.dataset.field, value });
+    if (el.type !== 'checkbox') el.value = r.value;
+    el.classList.add('ring-2', 'ring-emerald-400');
+    setTimeout(() => el.classList.remove('ring-2', 'ring-emerald-400'), 1200);
+    toast('บันทึกแล้ว');
+  } catch (e) {
+    toast(e.message, 'error');
+    if (el.type === 'checkbox') el.checked = !el.checked;
+  } finally {
+    el.disabled = false;
+  }
+}
+
+/* ------------------------------------------------------------------ events */
+function bind() {
+  $('login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const pin = $('pin').value.trim();
+    if (!pin) return;
+    $('btn-login').disabled = true;
+    $('login-error').hidden = true;
+    try { await login(pin); } catch (err) { $('login-error').textContent = err.message; $('login-error').hidden = false; }
+    finally { $('btn-login').disabled = false; }
+  });
+  $('btn-logout').addEventListener('click', () => logout());
+  document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
+
+  $('sel-dept').addEventListener('change', () => {
+    state.dept = state.staff.depts.find((d) => d.id === $('sel-dept').value);
+    store.set('q_staff_dept', state.dept.id);
+    state.queue = null;
+    fillCounters();
+    startPolling();
+  });
+  $('sel-counter').addEventListener('change', () => {
+    state.counter = $('sel-counter').value;
+    store.set('q_staff_counter_' + state.dept.id, state.counter);
+    $('cur-counter').textContent = state.counter;
+    if (state.queue) renderQueue();
+  });
+  $('btn-refresh').addEventListener('click', loadQueue);
+  $('btn-next').addEventListener('click', callNext);
+  $('btn-recall').addEventListener('click', () => { const c = currentAtMyCounter(); if (c) setStatus(c.bookingId, 'CALLED'); });
+  $('btn-done').addEventListener('click', () => { const c = currentAtMyCounter(); if (c) setStatus(c.bookingId, 'DONE'); });
+  $('btn-noshow').addEventListener('click', () => { const c = currentAtMyCounter(); if (c && confirm('เรียกผ่านคิว ' + c.queueNo + '?\n(ขึ้นจอให้ติดต่อเจ้าหน้าที่ · กลับมาแล้วเรียกอีกครั้งได้)')) setStatus(c.bookingId, 'SKIPPED'); });
+  $('filters').addEventListener('click', (e) => { const b = e.target.closest('[data-filter]'); if (b) { state.filter = b.dataset.filter; renderQueue(); } });
+  $('queue-rows').addEventListener('click', (e) => { const b = e.target.closest('[data-act]'); if (b) setStatus(b.dataset.id, b.dataset.act); });
+  $('skip-list').addEventListener('click', (e) => { const b = e.target.closest('[data-act]'); if (b) setStatus(b.dataset.id, b.dataset.act); });
+
+  $('btn-dash').addEventListener('click', loadDashboard);
+  $('tab-settings').addEventListener('change', (e) => {
+    if (!e.target.dataset) return;
+    if (e.target.dataset.table) {
+      saveField(e.target).then(() => {
+        // โควตา/ช่วงของแผนก หรือโควตาเริ่มต้นเปลี่ยน → อัปเดตตัวเลขเทาในตารางโควตา
+        const f = e.target.dataset.field;
+        if (state.settings && (f === 'SlotQuota' || f === 'DefaultQuota')) {
+          const list = f === 'SlotQuota' ? state.settings.departments : state.settings.slots;
+          const keyCol = f === 'SlotQuota' ? 'DeptID' : 'SlotID';
+          const row = list.find((x) => x[keyCol] === e.target.dataset.key);
+          if (row) { row[f] = e.target.value; renderQuotaGrid(); }
+        }
+      });
+    } else if (e.target.dataset.quotaDept) {
+      saveQuota(e.target);
+    } else if (e.target.id === 'quota-date') {
+      state.quotaDate = e.target.value || '';
+      renderQuotaGrid();
+    }
+  });
+  $('quota-all').addEventListener('click', () => { state.quotaDate = ''; renderQuotaGrid(); });
+  $('quota-dates').addEventListener('click', (e) => { const b = e.target.closest('[data-qdate]'); if (b) { state.quotaDate = b.dataset.qdate; renderQuotaGrid(); } });
+
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && state.tab === 'call' && state.session) startPolling(); });
+
+  // รายงาน
+  document.querySelectorAll('.rkind').forEach((b) => b.addEventListener('click', () => { rpt.kind = b.dataset.rkind; syncReportControls(); }));
+  $('r-period').addEventListener('change', syncReportControls);
+  $('btn-report').addEventListener('click', loadReport);
+  $('btn-xls').addEventListener('click', downloadExcel);
+  $('btn-pdf').addEventListener('click', () => window.print());
+}
+
+/* ------------------------------------------------------------------ โลโก้ / ผู้พัฒนา */
+const brand = { systemName: '', orgName: '', logoUrl: '', developedBy: '' };
+
+async function loadBranding() {
+  try {
+    const r = await fetch(APP.API_URL + '?action=branding');
+    const j = await r.json();
+    if (j && j.ok) Object.assign(brand, j.data);
+  } catch (e) { /* ไม่มีโลโก้ก็ใช้งานได้ */ }
+  document.querySelectorAll('.brand-logo').forEach((el) => {
+    if (!brand.logoUrl) return;
+    el.src = brand.logoUrl; el.hidden = false;
+    el.onerror = () => { el.hidden = true; document.querySelectorAll('.brand-emoji').forEach((x) => { x.hidden = false; }); };
+  });
+  if (brand.logoUrl) document.querySelectorAll('.brand-emoji').forEach((el) => { el.hidden = true; });
+  document.querySelectorAll('.brand-sys').forEach((el) => { el.textContent = brand.systemName || el.textContent; });
+  document.querySelectorAll('.brand-org').forEach((el) => { el.textContent = brand.orgName || ''; });
+  document.querySelectorAll('.brand-credit').forEach((el) => { el.textContent = brand.developedBy ? 'พัฒนาโดย ' + brand.developedBy : ''; el.hidden = !brand.developedBy; });
+}
+
+/* ------------------------------------------------------------------ รายงาน */
+const rpt = { kind: 'service', data: null };
+const TH_M = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+const fmt = (n) => (n == null || n === '' ? '-' : Number(n).toLocaleString('th-TH'));
+const fmt1 = (n) => (n == null ? '-' : Number(n).toLocaleString('th-TH', { minimumFractionDigits: 1, maximumFractionDigits: 1 }));
+const fmt2 = (n) => (n == null ? '-' : Number(n).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+const thDate = (d) => { if (!d) return ''; const [y, m, dd] = d.split('-').map(Number); return dd + ' ' + TH_M[m - 1] + ' ' + (y + 543); };
+
+function initReportControls() {
+  const now = new Date();
+  const ymd = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+  $('r-day').value = ymd;
+  $('r-month').value = ymd.slice(0, 7);
+  const y = now.getFullYear();
+  $('r-year').innerHTML = [0, 1, 2, 3, 4].map((k) => `<option value="${y - k}">${y - k + 543}</option>`).join('');
+  $('r-dept').innerHTML = '<option value="*">ทุกแผนก (รวม)</option>' +
+    (state.staff ? state.staff.depts : []).map((d) => `<option value="${esc(d.id)}">${esc(d.icon)} ${esc(d.name)}</option>`).join('');
+  syncReportControls();
+}
+
+function syncReportControls() {
+  const p = $('r-period').value;
+  $('r-day-wrap').hidden = p !== 'day';
+  $('r-month-wrap').hidden = p !== 'month';
+  $('r-year-wrap').hidden = p !== 'year';
+  document.querySelectorAll('.rkind').forEach((b) => b.classList.toggle('tab-on', b.dataset.rkind === rpt.kind));
+}
+
+async function loadReport() {
+  const period = $('r-period').value;
+  const value = period === 'day' ? $('r-day').value : period === 'month' ? $('r-month').value : $('r-year').value;
+  const btn = $('btn-report');
+  btn.disabled = true; btn.textContent = 'กำลังประมวลผล...';
+  $('report-doc').innerHTML = '<p class="text-center text-slate-400 py-10">กำลังรวบรวมข้อมูล (รายงานรายปีอาจใช้เวลาสักครู่)...</p>';
+  try {
+    const d = await api(rpt.kind === 'survey' ? 'adminSurveyReport' : 'adminReport', { period, value, deptId: $('r-dept').value });
+    rpt.data = d; rpt.data.kind = rpt.kind;
+    $('report-doc').innerHTML = rpt.kind === 'survey' ? surveyReportHtml(d) : serviceReportHtml(d);
+    $('btn-xls').disabled = false; $('btn-pdf').disabled = false;
+  } catch (e) {
+    $('report-doc').innerHTML = `<p class="text-center text-rose-600 py-10">${esc(e.message)}</p>`;
+    $('btn-xls').disabled = true; $('btn-pdf').disabled = true;
+  } finally {
+    btn.disabled = false; btn.textContent = 'ดูรายงาน';
+  }
+}
+
+function rptHeader(d, title) {
+  const logo = d.logoUrl || brand.logoUrl;
+  return `<div style="display:flex;align-items:center;gap:16px;border-bottom:3px solid #047857;padding-bottom:12px">
+      ${logo ? `<img src="${esc(logo)}" alt="" style="width:72px;height:72px;object-fit:contain">` : ''}
+      <div style="flex:1">
+        <div style="font-size:13px;color:#64748b">${esc(d.orgName || brand.orgName || '')}</div>
+        <div style="font-size:20px;font-weight:800;color:#065f46">${esc(title)}</div>
+        <div style="font-size:14px;font-weight:600">${esc(d.label)} · ${esc(d.deptName)}</div>
+      </div>
+      <div style="text-align:right;font-size:11px;color:#64748b">ช่วงข้อมูล ${esc(thDate(d.from))}${d.from !== d.to ? ' – ' + esc(thDate(d.to)) : ''}<br>
+        ออกรายงาน ${esc(d.generatedAt)}</div>
+    </div>`;
+}
+
+function rptFooter(d) {
+  const dev = d.developedBy || brand.developedBy;
+  return `<div style="margin-top:24px;padding-top:8px;border-top:1px solid #e5e7eb;font-size:11px;color:#94a3b8;display:flex;justify-content:space-between">
+      <span>${esc(d.systemName || 'ระบบจองคิวออนไลน์')}</span><span>${dev ? 'พัฒนาโดย ' + esc(dev) : ''}</span></div>`;
+}
+
+const kpi = (label, value, sub) => `<div class="kpi"><span>${label}</span><b>${value}</b>${sub ? `<span>${sub}</span>` : ''}</div>`;
+const bar = (pct) => `<div class="bar"><i style="width:${Math.max(0, Math.min(100, pct))}%"></i></div>`;
+
+function serviceRow(name, x, cls) {
+  return `<tr class="${cls || ''}"><td class="l">${esc(name)}</td><td>${fmt(x.booked)}</td><td>${fmt(x.DONE)}</td><td>${fmt(x.NO_SHOW)}</td>
+    <td>${fmt(x.CANCELLED)}</td><td>${fmt(x.WAITING + x.CALLED)}</td><td>${fmt1(x.serviceRate)}%</td><td>${fmt1(x.avgServiceMin)}</td></tr>`;
+}
+const SERVICE_HEAD = '<tr><th>รายการ</th><th>จองทั้งหมด</th><th>ให้บริการแล้ว</th><th>ไม่มาตามนัด</th><th>ยกเลิก</th><th>รอ/ค้าง</th><th>% สำเร็จ</th><th>เวลาให้บริการเฉลี่ย (นาที)</th></tr>';
+
+function serviceReportHtml(d) {
+  const t = d.totals;
+  const maxTrend = Math.max(1, ...d.trend.map((x) => x.booked));
+  let n = 0; const sec = () => ++n + '. ';
+  let h = `<div class="rpt">${rptHeader(d, 'รายงานสรุปการให้บริการ')}
+    <h2>${sec()}สรุปภาพรวม</h2>
+    <div class="kpis">
+      ${kpi('จองทั้งหมด (คิว)', fmt(t.booked))}
+      ${kpi('ให้บริการแล้ว', fmt(t.DONE), fmt1(t.serviceRate) + '% ของที่จอง')}
+      ${kpi('ไม่มาตามนัด', fmt(t.NO_SHOW), fmt1(t.noShowRate) + '%')}
+      ${kpi('ยกเลิกโดยสมาชิก', fmt(t.CANCELLED))}
+      ${kpi('เวลาให้บริการเฉลี่ย', fmt1(t.avgServiceMin) + ' นาที', 'ตั้งแต่เรียกคิวจนเสร็จ')}
+    </div>`;
+  if (d.deptId === '*' && d.byDept.length) {
+    h += `<h2>${sec()}แยกตามแผนก</h2><table>${SERVICE_HEAD}${d.byDept.map((x) => serviceRow(x.name, x)).join('')}${serviceRow('รวมทุกแผนก', t, 'total')}</table>`;
+  }
+  if (d.trend.length) {
+    h += `<h2>${sec()}${d.period === 'year' ? 'แยกรายเดือน' : 'แยกรายวัน'}</h2>
+      <table><tr><th>${d.period === 'year' ? 'เดือน' : 'วันที่'}</th><th>จอง</th><th>ให้บริการแล้ว</th><th>ไม่มา</th><th>ยกเลิก</th><th>% สำเร็จ</th><th style="width:30%">สัดส่วน</th></tr>
+      ${d.trend.map((x) => `<tr><td class="l">${esc(d.period === 'year' ? x.label : thDate(x.key))}</td><td>${fmt(x.booked)}</td><td>${fmt(x.DONE)}</td><td>${fmt(x.NO_SHOW)}</td><td>${fmt(x.CANCELLED)}</td><td>${fmt1(x.serviceRate)}%</td><td>${bar(100 * x.booked / maxTrend)}</td></tr>`).join('')}</table>`;
+  }
+  h += `<h2>${sec()}แยกตามช่วงเวลา</h2><table>${SERVICE_HEAD}${d.bySlot.map((x) => serviceRow(x.label, x)).join('')}</table>`;
+  if (d.byCounter.length) {
+    h += `<h2>${sec()}แยกตามช่องบริการ</h2><table><tr><th>แผนก</th><th>ช่อง</th><th>ให้บริการแล้ว</th><th>ไม่มา</th><th>เวลาให้บริการเฉลี่ย (นาที)</th></tr>
+      ${d.byCounter.map((x) => `<tr><td class="l">${esc(x.deptName)}</td><td class="c">${esc(x.counter)}</td><td>${fmt(x.DONE)}</td><td>${fmt(x.NO_SHOW)}</td><td>${fmt1(x.avgServiceMin)}</td></tr>`).join('')}</table>`;
+  }
+  if (!t.all) h += '<p style="text-align:center;color:#94a3b8;margin:24px 0">ไม่มีข้อมูลการจองในช่วงเวลานี้</p>';
+  return h + rptFooter(d) + '</div>';
+}
+
+function surveyRow(name, x, cls) {
+  return `<tr class="${cls || ''}"><td class="l">${esc(name)}</td><td>${fmt(x.responses)}</td><td>${x.done ? fmt1(x.responseRate) + '%' : '-'}</td>
+    <td>${fmt2(x.overall)}</td><td>${fmt2(x.speed)}</td><td>${fmt2(x.courtesy)}</td><td>${fmt1(x.satisfiedRate)}%</td></tr>`;
+}
+const SURVEY_HEAD = '<tr><th>รายการ</th><th>ผู้ตอบ</th><th>อัตราตอบกลับ</th><th>พึงพอใจโดยรวม (เต็ม 5)</th><th>ความรวดเร็ว</th><th>ความสุภาพ/การให้ข้อมูล</th><th>% พึงพอใจมาก–มากที่สุด</th></tr>';
+const STAR_LABEL = ['', 'ควรปรับปรุง (1)', 'พอใช้ (2)', 'ปานกลาง (3)', 'ดี (4)', 'ดีมาก (5)'];
+
+function surveyReportHtml(d) {
+  const t = d.totals;
+  const maxD = Math.max(1, ...t.dist);
+  let n = 0; const sec = () => ++n + '. ';
+  let h = `<div class="rpt">${rptHeader(d, 'รายงานผลการประเมินความพึงพอใจการให้บริการ')}
+    <h2>${sec()}สรุปภาพรวม</h2>
+    <div class="kpis">
+      ${kpi('จำนวนผู้ตอบ', fmt(t.responses) + ' คน', 'จากผู้รับบริการ ' + fmt(t.done) + ' คิว')}
+      ${kpi('อัตราตอบกลับ', fmt1(t.responseRate) + '%')}
+      ${kpi('พึงพอใจโดยรวม', fmt2(t.overall) + ' / 5')}
+      ${kpi('ความรวดเร็ว', fmt2(t.speed) + ' / 5')}
+      ${kpi('ความสุภาพ/การให้ข้อมูล', fmt2(t.courtesy) + ' / 5')}
+      ${kpi('พึงพอใจระดับดี–ดีมาก', fmt1(t.satisfiedRate) + '%')}
+    </div>
+    <h2>${sec()}การกระจายของคะแนนความพึงพอใจโดยรวม</h2>
+    <table><tr><th>ระดับ</th><th>จำนวน</th><th>ร้อยละ</th><th style="width:45%">สัดส่วน</th></tr>
+      ${[5, 4, 3, 2, 1].map((s) => `<tr><td class="l">${'★'.repeat(s)} ${STAR_LABEL[s]}</td><td>${fmt(t.dist[s - 1])}</td><td>${t.responses ? fmt1(100 * t.dist[s - 1] / t.responses) : '0.0'}%</td><td>${bar(100 * t.dist[s - 1] / maxD)}</td></tr>`).join('')}
+    </table>`;
+  if (d.deptId === '*' && d.byDept.length) {
+    h += `<h2>${sec()}แยกตามแผนก</h2><table>${SURVEY_HEAD}${d.byDept.map((x) => surveyRow(x.name, x)).join('')}${surveyRow('รวมทุกแผนก', t, 'total')}</table>`;
+  }
+  if (d.byCounter.length) {
+    h += `<h2>${sec()}แยกตามช่องบริการ</h2><table><tr><th>แผนก</th><th>ช่อง</th><th>ผู้ตอบ</th><th>โดยรวม</th><th>ความรวดเร็ว</th><th>ความสุภาพ</th></tr>
+      ${d.byCounter.map((x) => `<tr><td class="l">${esc(x.deptName)}</td><td class="c">${esc(x.counter)}</td><td>${fmt(x.responses)}</td><td>${fmt2(x.overall)}</td><td>${fmt2(x.speed)}</td><td>${fmt2(x.courtesy)}</td></tr>`).join('')}</table>`;
+  }
+  if (d.comments.length) {
+    h += `<h2>${sec()}ข้อเสนอแนะจากผู้รับบริการ (${fmt(d.comments.length)} รายการ)</h2><table><tr><th>วันที่</th><th>แผนก</th><th>ช่อง</th><th>คะแนน</th><th>ข้อเสนอแนะ</th></tr>
+      ${d.comments.map((x) => `<tr><td class="c" style="white-space:nowrap">${esc(thDate(x.date))}</td><td class="l">${esc(x.deptName)}</td><td class="c">${esc(x.counter)}</td><td class="c">${'★'.repeat(x.overall)}</td><td class="l">${esc(x.comment)}</td></tr>`).join('')}</table>`;
+  }
+  if (!t.responses) h += '<p style="text-align:center;color:#94a3b8;margin:24px 0">ยังไม่มีผู้ตอบแบบประเมินในช่วงเวลานี้</p>';
+  return h + rptFooter(d) + '</div>';
+}
+
+/** ดาวน์โหลดเป็นไฟล์ Excel (.xls) — สร้างจากตารางในรายงาน เปิดได้ทั้ง Excel และ Google Sheets */
+function downloadExcel() {
+  const d = rpt.data;
+  if (!d) return;
+  const doc = $('report-doc').cloneNode(true);
+  doc.querySelectorAll('.bar').forEach((el) => el.remove());
+  doc.querySelectorAll('img').forEach((el) => el.remove());
+  const kpis = [...doc.querySelectorAll('.kpi')].map((k) => '<tr><td>' + [...k.children].map((c) => esc(c.textContent)).join('</td><td>') + '</td></tr>').join('');
+  doc.querySelectorAll('.kpis').forEach((el) => { el.outerHTML = '<table border="1">' + kpis + '</table>'; });
+  doc.querySelectorAll('table').forEach((tb) => tb.setAttribute('border', '1'));
+  const html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">' +
+    '<head><meta charset="UTF-8"><style>td,th{font-family:Tahoma;font-size:11pt;} th{background:#ecfdf5;} h2{font-size:13pt;color:#065f46;}</style></head><body>' +
+    doc.innerHTML + '</body></html>';
+  const name = (d.kind === 'survey' ? 'รายงานแบบประเมิน' : 'รายงานการให้บริการ') + '_' + (d.period === 'day' ? d.from : d.period === 'month' ? d.from.slice(0, 7) : d.from.slice(0, 4)) +
+    '_' + (d.deptId === '*' ? 'ทุกแผนก' : d.deptId) + '.xls';
+  const blob = new Blob(['﻿' + html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+/* ------------------------------------------------------------------ init */
+async function init() {
+  bind();
+  loadBranding();
+  try {
+    const saved = JSON.parse(store.get('q_staff_session') || 'null');
+    if (saved && saved.exp > Date.now()) {
+      state.session = saved.session;
+      const d = await api('staffMe');
+      startApp(d.staff);
+      return;
+    }
+  } catch (e) { /* ล็อกอินใหม่ */ }
+  logout();
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
